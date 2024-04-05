@@ -41,17 +41,17 @@ frequenciesDict = {
 }
 
 fs = 195000.0/2.0 # Acquisition sampling rate
-dataFolder = '../../data'
-waveAnalysisFolder = os.path.join(dataFolder,'waveAnalysisResults')
+# dataFolder = '../../data'
+# waveAnalysisFolder = os.path.join(dataFolder,'waveAnalysisResults')
 
-data,thresholds,dataversion = at.loadFiles(datafolder=dataFolder)
-thresholds['ID'] = thresholds['MouseN - AGE'].str.split(' - ',expand=True)[0].astype(int)
-thresholds['Age (months)'] = thresholds['MouseN - AGE'].str.split(' - ',expand=True)[1].str.split('month',expand=True)[0].astype(int)
-strain = []
-for el in thresholds['ID']:
-    strain.append(data.loc[data['ID']==el,'Strain'].values[0])
-thresholds['Strain'] = strain
-dates = data['ID'].unique()
+# data,thresholds,dataversion = at.loadFiles(datafolder=dataFolder)
+# thresholds['ID'] = thresholds['MouseN - AGE'].str.split(' - ',expand=True)[0].astype(int)
+# thresholds['Age (months)'] = thresholds['MouseN - AGE'].str.split(' - ',expand=True)[1].str.split('month',expand=True)[0].astype(int)
+# strain = []
+# for el in thresholds['ID']:
+#     strain.append(data.loc[data['ID']==el,'Strain'].values[0])
+# thresholds['Strain'] = strain
+# dates = data['ID'].unique()
 
 def makeFigureqt(h1,h2,out,layout,title,wavePoints = None,plotDict = None,wavePointsPlotDict = None,thresholds = None):
     '''
@@ -93,9 +93,9 @@ def makeFigureqt(h1,h2,out,layout,title,wavePoints = None,plotDict = None,wavePo
         linecol ='k'
         if thresholds is not None:
             if h2[i]>=thresholds[h1[i]]:
-                linecol = 'r'
-            else:
                 linecol = 'k'
+            else:
+                linecol = 'r'
 
         ## Add the traces to the plots
         plotID = str(nint-row-1)+ ' ' + str(column)
@@ -190,10 +190,10 @@ class abrWindow(pg.GraphicsView):
     def __init__(self, parent=None, useOpenGL=None, background='default'):
         super().__init__(parent, useOpenGL, background)
 
-        self.setWindowTitle('Your title') 
+        self.setWindowTitle('ABR Wave Analysis - Sheffield Hearing research group') 
         self.setGeometry(0,0,1300,1000)
         self.layout = pg.GraphicsLayout()
-#layout.layout.setContentsMargins(-100,-100,-100,-100)
+        #layout.layout.setContentsMargins(-100,-100,-100,-100)
         self.outerlayout = pg.GraphicsLayout()
 
         self.titleLabel = self.outerlayout.addLabel('Title',color='k',size='16pt',bold=True,row=0,col=0,colspan=10)
@@ -213,10 +213,7 @@ class abrWindow(pg.GraphicsView):
 
         params = [
         # {'name':'Strain','type':'list','values':['6N','Repaired']},
-            {'name':'ID','type':'list','values':dict(zip(dates.astype(str),np.arange(dates.size)))},
-            {'name':'Age','type':'list','values':[1,3,5,6,9,12]},
-            {'name':'Prev mouse','type':'action'},
-            {'name':'Next mouse','type':'action'},
+            {'name':'Open file','type':'action'},
             {'name':'Guess Wave Peak positions','type':'action'},
             {'name':'Guess Wave Peak higher intensities','type':'action'},
             {'name':'Guess Wave Peak lower intensities','type':'action'},
@@ -238,11 +235,23 @@ class abrWindow(pg.GraphicsView):
         self.makeConnections()
         self.show()
         self.t.show()
+       
+
+    def openFileCb(self):
+        dlg = pg.widgets.FileDialog.FileDialog()
+        #dlg.setFileMode(QFileDialog.AnyFile)
+    #    dlg.setFilter("CSV files (*.csv)")
+        #filenames = QStringList()
+
+        if dlg.exec_():
+            filenames = dlg.selectedFiles()
+        fullpath = filenames[0]
+        self.folder, self.currentFile = os.path.split(fullpath)
         self.initData()
 
-
     def initData(self):
-        abr = at.extractABR(os.path.join(dataFolder,data.loc[[1],'Folder 1'].values[0]))
+        
+        abr = at.extractABR(os.path.join(self.folder,self.currentFile))
 
         self.wavePoints = pd.DataFrame(columns=['Freq',	'Intensity','P1_x','P1_y','N1_x','N1_y','P2_x','P2_y','N2_x','N2_y','P3_x','P3_y','N3_x','N3_y','P4_x','P4_y','N4_x','N4_y'])
 
@@ -256,11 +265,11 @@ class abrWindow(pg.GraphicsView):
         self.setActivePlot(0,0)
 
     def loadWaveAnalysis(self):
-        dat = dates[self.p['ID']]
-        filename = str(dat)+' - '+str(self.p['Age'])+'month.csv'
+       # dat = dates[self.p['ID']]
+       # filename = str(dat)+' - '+str(self.p['Age'])+'month.csv'
         #print(filename)
         try:
-            self.wavePoints = pd.read_csv(os.path.join(waveAnalysisFolder,filename))
+            self.wavePoints = pd.read_csv(os.path.join(self.folder,'TODORESULTS.csv'))
         except FileNotFoundError:
             self.wavePoints = pd.DataFrame(columns=['Freq',	'Intensity','P1_x','P1_y','N1_x','N1_y','P2_x','P2_y','N2_x','N2_y','P3_x','P3_y','N3_x','N3_y','P4_x','P4_y','N4_x','N4_y'])
             print('Wave analysis not found')
@@ -308,10 +317,7 @@ class abrWindow(pg.GraphicsView):
         
     def makeConnections(self):
         #p.keys()['Strain'].sigValueChanged.connect(changeStrainCb)
-        self.p.keys()['Age'].sigValueChanged.connect(self.changeAgeCb)
-        self.p.keys()['ID'].sigValueChanged.connect(self.changeIDCb)
-        self.p.keys()['Next mouse'].sigActivated.connect(self.nextMouseCb)
-        self.p.keys()['Prev mouse'].sigActivated.connect(self.prevMouseCb)
+        self.p.keys()['Open file'].sigActivated.connect(self.openFileCb)
         self.p.keys()['Save results'].sigActivated.connect(self.saveResultsCb)
         self.p.keys()['Guess Wave Peak positions'].sigActivated.connect(lambda: self.guessWavePoints('both'))
         self.p.keys()['Guess Wave Peak higher intensities'].sigActivated.connect(lambda: self.guessWavePoints('higher'))
@@ -354,10 +360,12 @@ class abrWindow(pg.GraphicsView):
             self.setActivePlot(row,col+1)
 
     def saveResultsCb(self):
-        dat = dates[self.p['ID']]
-        filename = str(dat)+' - '+str(self.p['Age'])+'month.csv'
-        
-        self.wavePoints.sort_values(['Freq','Intensity']).to_csv(os.path.join(waveAnalysisFolder,filename),index=False)
+       # dat = dates[self.p['ID']]
+        filename = os.path.splitext(self.currentFile)[0]+'_waveAnalysisResults.csv'
+        self.wavePoints.sort_values(['Freq','Intensity'])
+        self.wavePoints['Wave 1 amplitude (uV)'] = self.wavePoints['P1_y'] - self.wavePoints['N1_y']
+        self.wavePoints['Wave 1 latency (ms)'] = self.wavePoints['P1_x']
+        self.wavePoints.to_csv(os.path.join(self.folder,filename),index=False)
 
     def retrieveResultsCb(self):
     
@@ -407,24 +415,21 @@ class abrWindow(pg.GraphicsView):
         self.updateCurrentPlotCb() 
 
 
-    def changeAgeCb(self):
-        #print(self.p['Age'])
-        self.changeIDCb()
 
     def changeIDCb(self): #TODO: load the new WavePoints
-        
-        self.loadWaveAnalysis()
-        self.updateCurrentPlotCb()
-        self.setActivePlot(0,0)
+       
+         self.loadWaveAnalysis()
+         self.updateCurrentPlotCb()
+         self.setActivePlot(0,0)
         
 
 
     def updateCurrentPlotCb(self):
-        dat = dates[self.p['ID']]
-        indices = []
-        agesFolderDict  = {1:'1',3:'2',6:'3',9:'4',12:'5'}
-        currFolder = agesFolderDict[self.p['Age']]
-        abr = at.extractABR(os.path.join(dataFolder,data.loc[data['ID']==dat,'Folder '+currFolder].values[0]))
+        #dat = dates[self.p['ID']]
+    
+      
+       
+        abr = at.extractABR(os.path.join(self.folder,self.currentFile))
         #abr2 = at.extractABR(os.path.join(dataFolder,data.loc[data['ID']==dat,'Folder 2'].values[0]))
         #abr = pd.concat([abr,abr2])
         freqs = []
@@ -434,19 +439,17 @@ class abrWindow(pg.GraphicsView):
             intens.append(el[1])
 
         frequencies2 =[ 100,3000,6000,12000,18000,24000,30000,36000,42000]
-        self.threshDict = dict(zip(frequencies2,thresholds.loc[thresholds['MouseN - AGE']==str(dat)+' - '+str(self.p['Age'])+'month',frequencies].values[0])) 
+
+        try:
+            self.threshDict = dict(zip(frequencies2,thresholds.loc[thresholds['MouseN - AGE']==str(dat)+' - '+str(self.p['Age'])+'month',frequencies].values[0])) 
+        except:
+            self.threshDict =  dict(zip(frequencies2,[0]*9))
         
+
         self.plotDict,self.wavePointsPlotDict, self.plotToFreqIntMap  = makeFigureqt(freqs,intens,abr.values,self.layout,'',plotDict=self.plotDict ,thresholds=self.threshDict,wavePoints=self.wavePoints,wavePointsPlotDict=self.wavePointsPlotDict)
-        self.titleLabel.setText(str(dat)+' - '+str(self.p['Age'])+ ' month(s)')
+        self.titleLabel.setText(self.currentFile)
         self.highlightTraceAt(self.activeRowCol[0],self.activeRowCol[1],3)
 
-
-    def nextMouseCb(self):
-        self.p.keys()['ID'].setValue(self.p['ID']+1)
-
-    def prevMouseCb(self):
-        #print(p['ID'])
-        self.p.keys()['ID'].setValue(self.p['ID']-1)
     
     def onMouseClicked(self,evt):
         if evt.double():
