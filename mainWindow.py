@@ -148,8 +148,8 @@ def makeFigureqt(h1,h2,out,layout,title,wavePoints = None,plotDict = None,wavePo
 
                 if wavePointsPlotDict is None:
                     p2 = layout.getItem(nint-row-1,column)
-                    p1Point = pg.ScatterPlotItem(x=[],y=[],symbol = '+',size=3)
-                            #p1Label.setPos(np.nan,np.nan)
+                    p1Point = pg.ScatterPlotItem(x=[],y=[],symbol = '+',pen=pg.mkPen('r'),)
+                            
                     p2.addItem(p1Point)
                     
 
@@ -162,8 +162,7 @@ def makeFigureqt(h1,h2,out,layout,title,wavePoints = None,plotDict = None,wavePo
                         p1Point.setData(x,y)
                     except KeyError: 
                         p2 = layout.getItem(nint-row-1,column)
-                        p1Point = pg.ScatterPlotItem(x=[],y=[],symbol = '+',size=3)
-                                #p1Label.setPos(np.nan,np.nan)
+                        p1Point = pg.ScatterPlotItem(x=[],y=[],symbol = '+',size=4,pen=pg.mkPen('r'),)
                         p2.addItem(p1Point)
                         
 
@@ -261,15 +260,16 @@ class abrWindow(pg.GraphicsView):
             freqs.append(el[0])
             intens.append(el[1])
         self.plotDict,self.wavePointsPlotDict, self.plotToFreqIntMap = makeFigureqt(freqs,intens,abr.values,self.layout,'',wavePoints=None)
-        self.changeIDCb()
+
+        self.loadWaveAnalysis()
+        self.updateCurrentPlotCb()
         self.setActivePlot(0,0)
 
+
     def loadWaveAnalysis(self):
-       # dat = dates[self.p['ID']]
-       # filename = str(dat)+' - '+str(self.p['Age'])+'month.csv'
-        #print(filename)
-        try:
-            self.wavePoints = pd.read_csv(os.path.join(self.folder,'TODORESULTS.csv'))
+        try: 
+            filename = os.path.splitext(self.currentFile)[0]+'_waveAnalysisResults.csv'
+            self.wavePoints = pd.read_csv(os.path.join(self.folder,filename))
         except FileNotFoundError:
             self.wavePoints = pd.DataFrame(columns=['Freq',	'Intensity','P1_x','P1_y','N1_x','N1_y','P2_x','P2_y','N2_x','N2_y','P3_x','P3_y','N3_x','N3_y','P4_x','P4_y','N4_x','N4_y'])
             print('Wave analysis not found')
@@ -416,12 +416,7 @@ class abrWindow(pg.GraphicsView):
 
 
 
-    def changeIDCb(self): #TODO: load the new WavePoints
-       
-         self.loadWaveAnalysis()
-         self.updateCurrentPlotCb()
-         self.setActivePlot(0,0)
-        
+
 
 
     def updateCurrentPlotCb(self):

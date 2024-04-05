@@ -33,7 +33,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
 
     def __init__(self, parent=None, show=True, size=None, title=None, **kargs):
         super().__init__(parent, show, size, title, **kargs)
-        self.setWindowTitle('pyqtgraph example: crosshair')
+        self.setWindowTitle('Current waveform')
         self.setGeometry(1300,0,600,500)
         self.label = pg.LabelItem(justify='right')
         self.addItem(self.label)
@@ -311,7 +311,8 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         self.p.keys()[point].keys()['y'].setValue(0)
         self.labelDict[point].setPos(np.nan,np.nan)
         self.pointDict[point].setData([0],[0])
-    
+        self.finishSignal.emit()
+
     def resetAllPoints(self):
         for point in ['P1','N1','P2','N2','P3','N3','P4','N4']:
             self.resetPoint(point)
