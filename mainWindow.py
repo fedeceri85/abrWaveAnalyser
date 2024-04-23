@@ -278,7 +278,10 @@ class abrWindow(pg.GraphicsView):
     def setActivePlot(self,row=0,col=0):
         
         # reset previous active plot
-        self.highlightTraceAt(self.activeRowCol[0],self.activeRowCol[1],1)
+        try:
+            self.highlightTraceAt(self.activeRowCol[0],self.activeRowCol[1],1)
+        except KeyError: # If the trace was not highlighted move on
+            pass
         
         try:
             self.highlightTraceAt(row,col,3)
@@ -475,7 +478,7 @@ class abrWindow(pg.GraphicsView):
                     plItem = self.plotDict[item.objectName()]
                     
               
-
+            
                     row, col = [int(ee) for ee in item.objectName().split(' ')]
 
                     self.setActivePlot(row,col)
