@@ -10,6 +10,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore,QtWidgets
 from wavePeaksWindow import myGLW, findNearestPeak
 import pandas as pd
+import itertools
 # Set white graph
 pg.setConfigOptions(antialias=True)
 pg.setConfigOption('background', 'w')
@@ -252,7 +253,7 @@ class abrWindow(pg.GraphicsView):
         
         abr = at.extractABR(os.path.join(self.folder,self.currentFile))
 
-        self.wavePoints = pd.DataFrame(columns=['Freq',	'Intensity','P1_x','P1_y','N1_x','N1_y','P2_x','P2_y','N2_x','N2_y','P3_x','P3_y','N3_x','N3_y','P4_x','P4_y','N4_x','N4_y'])
+       # self.wavePoints = pd.DataFrame(columns=['Freq',	'Intensity','P1_x','P1_y','N1_x','N1_y','P2_x','P2_y','N2_x','N2_y','P3_x','P3_y','N3_x','N3_y','P4_x','P4_y','N4_x','N4_y'])
 
         freqs = []
         intens = []
@@ -275,7 +276,7 @@ class abrWindow(pg.GraphicsView):
             print('Wave analysis not found')
 
     def setActivePlot(self,row=0,col=0):
-
+        
         # reset previous active plot
         self.highlightTraceAt(self.activeRowCol[0],self.activeRowCol[1],1)
         
@@ -371,6 +372,7 @@ class abrWindow(pg.GraphicsView):
     
         points = self.waveAnalysisWidget.getPoints()
 
+
         #Check if the combination of freq and intensity exists already in the wavePoints DataFrame
         freq,intens = self.plotToFreqIntMap[self.activeRowCol]
 
@@ -410,7 +412,7 @@ class abrWindow(pg.GraphicsView):
                 self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==intens) ,'P'+str(ii)+'_y'] =  points['P'+str(ii)][1]
                 self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==intens) ,'N'+str(ii)+'_y'] =  points['N'+str(ii)][1]
 
-        print(self.wavePoints)
+        #print(self.wavePoints)
 
         self.updateCurrentPlotCb() 
 

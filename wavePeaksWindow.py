@@ -306,12 +306,14 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         elif (ev.key() == Qt.Key_Return) or  (ev.key() == Qt.Key_Enter) or  (ev.key() == Qt.Key_Space):
             self.finishSignal.emit()
 
-    def resetPoint(self,point):
+    def resetPoint(self,point,emitSignal = True):
         self.p.keys()[point].keys()['x'].setValue(0)  
         self.p.keys()[point].keys()['y'].setValue(0)
         self.labelDict[point].setPos(np.nan,np.nan)
         self.pointDict[point].setData([0],[0])
-        self.finishSignal.emit()
+
+        if emitSignal:
+            self.finishSignal.emit()
 
     def resetAllPoints(self):
         for point in ['P1','N1','P2','N2','P3','N3','P4','N4']:
@@ -342,20 +344,23 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         self.times = times
         self.data1 = trace
 
+       
 
         if wavePoints is not None:
             for point in ['P1','N1','P2','N2','P3','N3','P4','N4']:
                 if wavePoints[point+'_x'].isna().values[0]==False:
-                    self.setPoint(point,wavePoints[point+'_x'].values[0],wavePoints[point+'_y'].values[0])        
+                    self.setPoint(point,wavePoints[point+'_x'].values[0],wavePoints[point+'_y'].values[0]) 
+                else:
+                    self.resetPoint(point,emitSignal=False)
         else:
             for point in self.pointDict.keys():
-                self.resetPoint(point)
+                self.resetPoint(point,emitSignal=False)
 
         self.linePlot.setData(self.times,self.data1)
         self.p1.setXRange(0,8)
         
 
-        self.p1.setXRange(0,8)
+        #self.p1.setXRange(0,8)
     
 
 
