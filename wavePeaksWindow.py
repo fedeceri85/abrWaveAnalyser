@@ -135,7 +135,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         {'name':'Peak type','type':'list','values':['P1','N1','P2','N2','P3','N3','P4','N4']},
         {'name':'Auto find peak','type':'bool','value':True},
         {'name':'RESET ALL POINTS','type':'action'},
-
+        {'name':'RESET ALL LOWER INTENSITIES','type':'action'},
         {'name':'P1','type':'group','children':
             [   {'name':'x','type':'float','value':0},
                 {'name':'y','type':'float','value':0},
@@ -213,6 +213,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         self.p1.scene().sigMouseClicked.connect(self.onClick)
         
         self.p.keys()['RESET ALL POINTS'].sigActivated.connect(self.resetAllPoints)
+        self.p.keys()['RESET ALL LOWER INTENSITIES'].sigActivated.connect(self.resetAllPointsLowerInt)
 
 
         self.p.keys()['P1'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('P1'))
@@ -317,7 +318,16 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
 
     def resetAllPoints(self):
         for point in ['P1','N1','P2','N2','P3','N3','P4','N4']:
-            self.resetPoint(point)
+            self.resetPoint(point,emitSignal=False)
+        self.finishSignal.emit()
+    
+    def resetAllPointsLowerInt(self):
+        for i in range(22): # TODO: If there are more than 22 intensities this will fail
+            self.changeTraceSignal.emit('Down')
+            for point in ['P1','N1','P2','N2','P3','N3','P4','N4']:
+                self.resetPoint(point,emitSignal=False)
+            self.finishSignal.emit()
+
 
     def setPoint(self,point,x,y):
         self.labelDict[point].setPos(x,y)

@@ -192,24 +192,7 @@ class abrWindow(pg.GraphicsView):
 
         self.setWindowTitle('ABR Wave Analysis - Sheffield Hearing research group') 
         self.setGeometry(0,0,1300,1000)
-        self.layout = pg.GraphicsLayout()
-        #layout.layout.setContentsMargins(-100,-100,-100,-100)
-        self.outerlayout = pg.GraphicsLayout()
 
-        self.titleLabel = self.outerlayout.addLabel('Title',color='k',size='16pt',bold=True,row=0,col=0,colspan=10)
-
-        for i,freq in enumerate(frequencies):
-            self.outerlayout.addLabel(freq,color='k',size='8pt',col=i+1,row=1)
-        
-        for i,intens in enumerate(intensitiesL[::-1]):
-            self.outerlayout.addLabel(intens,color='k',size='8pt',col=0,row=i+2)
-
-        self.outerlayout.addItem(self.layout,colspan=len(frequencies),rowspan=len(intensitiesL),row=2,col=1)
-
-        self.setCentralItem(self.outerlayout)
-        
-        self.sc = self.scene()
-        self.sc2 = self.layout.scene()
 
         params = [
         # {'name':'Strain','type':'list','values':['6N','Repaired']},
@@ -250,16 +233,43 @@ class abrWindow(pg.GraphicsView):
         self.initData()
 
     def initData(self):
-        
         abr = at.extractABR(os.path.join(self.folder,self.currentFile))
-
-       # self.wavePoints = pd.DataFrame(columns=['Freq',	'Intensity','P1_x','P1_y','N1_x','N1_y','P2_x','P2_y','N2_x','N2_y','P3_x','P3_y','N3_x','N3_y','P4_x','P4_y','N4_x','N4_y'])
 
         freqs = []
         intens = []
         for el in abr.index:
             freqs.append(el[0])
             intens.append(el[1])
+        frequencies = np.sort(list(set(freqs)))
+        intensitiesL = np.sort(list(set(intens)))
+        
+        self.layout = pg.GraphicsLayout()
+        #layout.layout.setContentsMargins(-100,-100,-100,-100)
+        self.outerlayout = pg.GraphicsLayout()
+
+        self.titleLabel = self.outerlayout.addLabel('Title',color='k',size='16pt',bold=True,row=0,col=0,colspan=10)
+
+        for i,freq in enumerate(frequencies):
+            try:
+                self.outerlayout.addLabel(frequenciesDict[int(freq)],color='k',size='10pt',col=i+1,row=1)
+            except KeyError:
+                self.outerlayout.addLabel(int(freq),color='k',size='10pt',col=i+1,row=1)
+        
+        for i,intens2 in enumerate(intensitiesL[::-1]):
+            self.outerlayout.addLabel(str(int(intens2))+' dB',color='k',size='10pt',col=0,row=i+2)
+
+        self.outerlayout.addItem(self.layout,colspan=len(frequencies),rowspan=len(intensitiesL),row=2,col=1)
+
+        self.setCentralItem(self.outerlayout)
+        
+        self.sc = self.scene()
+        self.sc2 = self.layout.scene()
+        self.sc2.sigMouseClicked.connect(self.onMouseClicked)
+        
+
+       # self.wavePoints = pd.DataFrame(columns=['Freq',	'Intensity','P1_x','P1_y','N1_x','N1_y','P2_x','P2_y','N2_x','N2_y','P3_x','P3_y','N3_x','N3_y','P4_x','P4_y','N4_x','N4_y'])
+
+
         self.plotDict,self.wavePointsPlotDict, self.plotToFreqIntMap = makeFigureqt(freqs,intens,abr.values,self.layout,'',wavePoints=None)
 
         self.loadWaveAnalysis()
@@ -331,7 +341,7 @@ class abrWindow(pg.GraphicsView):
         self.waveAnalysisWidget.changeTraceSignal.connect(self.navigateTraces)
         self.waveAnalysisWidget.guessAboveSignal.connect(lambda: self.guessWavePoints('higher'))
         self.waveAnalysisWidget.guessBelowSignal.connect(lambda: self.guessWavePoints('lower'))
-        self.sc2.sigMouseClicked.connect(self.onMouseClicked)
+
 
 
     def keyPressEvent(self, ev):
