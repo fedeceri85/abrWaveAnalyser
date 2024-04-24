@@ -271,7 +271,8 @@ class abrWindow(pg.GraphicsView):
 
 
         self.plotDict,self.wavePointsPlotDict, self.plotToFreqIntMap = makeFigureqt(freqs,intens,abr.values,self.layout,'',wavePoints=None)
-
+        
+        self.waveAnalysisWidget.p['Peak type'] = 'P1'
         self.loadWaveAnalysis()
         self.updateCurrentPlotCb()
         self.setActivePlot(0,0)
@@ -314,6 +315,8 @@ class abrWindow(pg.GraphicsView):
                 selectedWavePoints = None
         else:
             selectedWavePoints = None
+        
+        self.waveAnalysisWidget.p['Peak type'] = 'P1'
         self.waveAnalysisWidget.setData(data[0],data[1],wavePoints = selectedWavePoints)
 
     def highlightTraceAt(self,row,col,pensize=3):
