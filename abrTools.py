@@ -24,65 +24,69 @@ def extractABR(filename,removeDuplicates = True,saveConverted=False):
     Extract ABR data from csv files (output of Biosig)
     If saveConverted, the converted file is saved as an ordered csv file in the same folder
     '''
-    f = open(filename,'r')
-    l = f.readlines()
-    out=[]
-    header1=[]
-    header2 = []
-    nclicks = 0 # number of clicks recordings at 70 dB -> this is to avoid the last recording done at the end.
-    for i,line in enumerate(l):
+    try:
+        f = open(filename,'r')
+        l = f.readlines()
+        out=[]
+        header1=[]
+        header2 = []
+        nclicks = 0 # number of clicks recordings at 70 dB -> this is to avoid the last recording done at the end.
+        for i,line in enumerate(l):
 
-        if line.startswith('[Trace_'):
-            nextL = l[i+1]
-            s = nextL.split(',')
-            try: 
-                indicator = float(s[1])
-                nextindex=2
-            except:
-                indicator = float(s[2])
-                nextindex=3
-            if s[0].endswith('Cal')==False and s[1].endswith('Cal')==False and indicator!=42001:
+            if line.startswith('[Trace_'):
+                nextL = l[i+1]
+                s = nextL.split(',')
+                try: 
+                    indicator = float(s[1])
+                    nextindex=2
+                except:
+                    indicator = float(s[2])
+                    nextindex=3
+                if s[0].endswith('Cal')==False and s[1].endswith('Cal')==False and indicator!=42001:
 
-                frequency = indicator#float(s[1]) 
-                
-                intensity = float(s[nextindex])
+                    frequency = indicator#float(s[1]) 
+                    
+                    intensity = float(s[nextindex])
 
-                if frequency == 100 and intensity == 70:
-                    nclicks = nclicks + 1
-                if nclicks<3 or  not ((frequency==100) and (intensity == 70)):
-                    header1.append(frequency)
-                    header2.append(intensity)
-                    nextL = l[i+2]
-                    j=0
-                    column =[]
-                    while nextL.startswith('[Trace_')==False:
+                    if frequency == 100 and intensity == 70:
+                        nclicks = nclicks + 1
+                    if nclicks<3 or  not ((frequency==100) and (intensity == 70)):
+                        header1.append(frequency)
+                        header2.append(intensity)
+                        nextL = l[i+2]
+                        j=0
+                        column =[]
+                        while nextL.startswith('[Trace_')==False:
 
-                        if nextL.startswith('TraceData_'):
-                            s0 = nextL.split('=')[1]
-                            s = s0.split(',')[:]
-                            
-                            for el in s:
-                                try:
-                                    column.append(float(el))
-                                except ValueError:
-                                    print("weird stuff goin on in "+filename)
-                        j=j+1
-                        try:
-                            nextL=l[i+2+j]
-                        except:
-                            break
+                            if nextL.startswith('TraceData_'):
+                                s0 = nextL.split('=')[1]
+                                s = s0.split(',')[:]
+                                
+                                for el in s:
+                                    try:
+                                        column.append(float(el))
+                                    except ValueError:
+                                        print("weird stuff goin on in "+filename)
+                            j=j+1
+                            try:
+                                nextL=l[i+2+j]
+                            except:
+                                break
 
-                    if column==[]:
-                        print(frequency)
-                    out.append(column)
+                        if column==[]:
+                            print(frequency)
+                        out.append(column)
 
-        else:
-            pass
-    if saveConverted:
-        table = np.vstack((header1,header2,np.array(out).T))
-        np.savetxt(filename+'converted.csv',table,delimiter=',')
+            else:
+                pass
+        if saveConverted:
+            table = np.vstack((header1,header2,np.array(out).T))
+            np.savetxt(filename+'converted.csv',table,delimiter=',')
 
-    pdOut = pd.DataFrame(out,index=[header1,header2]) 
+        pdOut = pd.DataFrame(out,index=[header1,header2]) 
+    except: #If an error is thrown, assume the file is already converted. 
+        pdOut = pd.read_csv(filename) 
+
     if removeDuplicates: # remove duplicated data
         t2 = pdOut.reset_index()
         pdOut['levels']=(t2['level_0'].astype(str)+'_'+t2['level_1'].astype(str)).values
