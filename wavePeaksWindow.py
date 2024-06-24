@@ -38,10 +38,13 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         self.label = pg.LabelItem(justify='right')
         self.addItem(self.label)
 
+        self.fs = fs
         self.p1 = self.addPlot(row=1, col=0)
         self.p1.setAutoVisible(y=True)
         self.initPlot()
         self.vb = self.p1.vb
+
+
 
         self.initParameterWindow()
         self.makeConnections()
@@ -54,7 +57,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
 
         self.data1 = pd.read_csv('testTrace.csv').values[:,1]#abr.values[155,:]
 
-        self.times = np.arange(self.data1.shape[0])/fs*1000
+        self.times = np.arange(self.data1.shape[0])/self.fs*1000
 
         self.linePlot = self.p1.plot(self.times,self.data1, pen="k")
         self.initPlotLabels()
@@ -252,12 +255,12 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
                 mousePoint = self.vb.mapSceneToView(event._scenePos)
                 if self.p['Auto find peak']:
                     if self.p['Peak type'].startswith('P'): 
-                        index = findNearestPeak(self.data1,int(mousePoint.x()/1000*fs),20)
+                        index = findNearestPeak(self.data1,int(mousePoint.x()/1000*self.fs),int(206E-6*self.fs))
                     elif self.p['Peak type'].startswith('N'): 
-                        index = findNearestPeak(self.data1,int(mousePoint.x()/1000*fs),20,negative=True)
-                    newX = index*1000/fs
+                        index = findNearestPeak(self.data1,int(mousePoint.x()/1000*self.fs),int(206E-6*self.fs),negative=True)
+                    newX = index*1000/self.fs
                 else:
-                    index = int(mousePoint.x()/1000*fs)
+                    index = int(mousePoint.x()/1000*self.fs)
                     newX = mousePoint.x()
 
                 if index > 0 and index < len(self.data1):

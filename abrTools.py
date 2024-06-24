@@ -92,8 +92,48 @@ def extractABR(filename,removeDuplicates = True,saveConverted=False):
         pdOut['levels']=(t2['level_0'].astype(str)+'_'+t2['level_1'].astype(str)).values
         pdOut.drop_duplicates(keep='last',subset='levels',inplace=True)
         pdOut.drop('levels',inplace=True,axis=1)
-    return pdOut
+    
+    fs = 195000.0/2.0 #So far this is the frequency of all our files.
+    return pdOut,fs
 
+def extractABRDS(filenames,folder='.'):
+    '''
+    Extract ABR data from csv files (Dwayne Simmons Lab - Lieberman system)
+    '''
+    out = []
+    fss = []
+    for filename in filenames:
+        print(filename)
+        df = pd.read_csv(os.path.join(folder,filename), encoding='unicode_escape',sep='\t',skiprows=5,header=0).reset_index()  
+        f = open(os.path.join(folder,filename), encoding='unicode_escape')
+        l = f.readlines()
+        for line in l:
+            if line.startswith(':LEVELS'):
+                ints = line.split(':')[-1].split(';')
+                intensities = [int(i) for i in ints if i !='\n']    
+
+            elif line.startswith(':SW EAR'):
+                asd = line
+                params = asd.split('\t')
+                for p in params:
+                    if p.startswith('SW FREQ'):
+                        freq = int(1000*float(p.split(':')[1]))
+                    elif p.startswith('SAMPLE'):
+                        fs = 1e6/float(p.split(':')[-1]) 
+                        fss.append(fs)
+
+        df.columns = intensities
+        header1 = [freq]*df.shape[1]
+        header2 = intensities
+        df2 = pd.DataFrame(df.T.values,index = [header1,header2])
+        out.append(df2)
+
+        if len(set(fss))!=1:
+            raise NotImplementedError('All the traces should have the same sampling frequency')
+        else:
+            fs = fss[0]
+        
+    return pd.concat(out),fs
 
 def makeFigure(h1,h2,out,title,thresholds = None):
     '''

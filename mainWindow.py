@@ -25,8 +25,8 @@ app = _instance
 
 
 
-frequencies = ['Click', '3 kHz', '6 kHz', '12 kHz', '18 kHz', '24 kHz',
-       '30 kHz', '36 kHz', '42 kHz']
+# frequencies = ['Click', '3 kHz', '6 kHz', '12 kHz', '18 kHz', '24 kHz',
+#        '30 kHz', '36 kHz', '42 kHz']
 intensitiesL = [str(x)+'dB' for x in range(0,100,5)]
      
 frequenciesDict = {
@@ -41,7 +41,7 @@ frequenciesDict = {
     42000: '42 kHz',
 }
 
-fs = 195000.0/2.0 # Acquisition sampling rate
+#fs = 195000.0/2.0 # Acquisition sampling rate
 # dataFolder = '../../data'
 # waveAnalysisFolder = os.path.join(dataFolder,'waveAnalysisResults')
 
@@ -54,7 +54,7 @@ fs = 195000.0/2.0 # Acquisition sampling rate
 # thresholds['Strain'] = strain
 # dates = data['ID'].unique()
 
-def makeFigureqt(h1,h2,out,layout,title,wavePoints = None,plotDict = None,wavePointsPlotDict = None,thresholds = None):
+def makeFigureqt(h1,h2,out,layout,title,fs,wavePoints = None,plotDict = None,wavePointsPlotDict = None,thresholds = None):
     '''
     Make a figure from ABR trace data using pyqtgraph. Modifies an existing figure if the pyqtgraphs plots are passed through plotDict
     '''
@@ -93,10 +93,13 @@ def makeFigureqt(h1,h2,out,layout,title,wavePoints = None,plotDict = None,wavePo
         #plotn = i+row*len(frequency)
         linecol ='k'
         if thresholds is not None:
-            if h2[i]>=thresholds[h1[i]]:
+            try:
+                if h2[i]>=thresholds[str(int(h1[i]))]:
+                    linecol = 'k'
+                else:
+                    linecol = 'r'
+            except KeyError:
                 linecol = 'k'
-            else:
-                linecol = 'r'
 
         ## Add the traces to the plots
         plotID = str(nint-row-1)+ ' ' + str(column)
@@ -197,6 +200,8 @@ class abrWindow(pg.GraphicsView):
         params = [
         # {'name':'Strain','type':'list','values':['6N','Repaired']},
             {'name':'Open file','type':'action'},
+            {'name':'Reverse polarity','type':'bool','value':False},
+            {'name':'Set threshold','type':'action'},
             {'name':'Guess Wave Peak positions','type':'action'},
             {'name':'Guess Wave Peak higher intensities','type':'action'},
             {'name':'Guess Wave Peak lower intensities','type':'action'},
@@ -233,14 +238,29 @@ class abrWindow(pg.GraphicsView):
         self.initData()
 
     def initData(self):
-        abr = at.extractABR(os.path.join(self.folder,self.currentFile))
+        try:
+            self.abr,self.fs = at.extractABR(os.path.join(self.folder,self.currentFile))
+        except:
+            #Try with DS files:
+            prefix,_,postfix = self.currentFile.rpartition('-')
+            files = []
+            for dirpath, dirnames, filenames in os.walk(self.folder):
+                for filename in filenames:
+                    if (prefix in filename) and ('_waveAnalysisResults' not in filename) and ('_thresholds' not in filename):
+                        files.append(filename)
+            files.sort()
+            self.abr,self.fs = at.extractABRDS(files,folder=self.folder)
+            self.currentFile = prefix
+        if self.p['Reverse polarity']:
+            self.abr = -self.abr
+        self.waveAnalysisWidget.fs = self.fs
 
         freqs = []
         intens = []
-        for el in abr.index:
+        for el in self.abr.index:
             freqs.append(el[0])
             intens.append(el[1])
-        frequencies = np.sort(list(set(freqs)))
+        self.frequencies = np.sort(list(set(freqs)))
         intensitiesL = np.sort(list(set(intens)))
         
         self.layout = pg.GraphicsLayout()
@@ -249,7 +269,7 @@ class abrWindow(pg.GraphicsView):
 
         self.titleLabel = self.outerlayout.addLabel('Title',color='k',size='16pt',bold=True,row=0,col=0,colspan=10)
 
-        for i,freq in enumerate(frequencies):
+        for i,freq in enumerate(self.frequencies):
             try:
                 self.outerlayout.addLabel(frequenciesDict[int(freq)],color='k',size='10pt',col=i+1,row=1)
             except KeyError:
@@ -258,7 +278,7 @@ class abrWindow(pg.GraphicsView):
         for i,intens2 in enumerate(intensitiesL[::-1]):
             self.outerlayout.addLabel(str(int(intens2))+' dB',color='k',size='10pt',col=0,row=i+2)
 
-        self.outerlayout.addItem(self.layout,colspan=len(frequencies),rowspan=len(intensitiesL),row=2,col=1)
+        self.outerlayout.addItem(self.layout,colspan=len(self.frequencies),rowspan=len(intensitiesL),row=2,col=1)
 
         self.setCentralItem(self.outerlayout)
         
@@ -270,7 +290,7 @@ class abrWindow(pg.GraphicsView):
        # self.wavePoints = pd.DataFrame(columns=['Freq',	'Intensity','P1_x','P1_y','N1_x','N1_y','P2_x','P2_y','N2_x','N2_y','P3_x','P3_y','N3_x','N3_y','P4_x','P4_y','N4_x','N4_y'])
 
 
-        self.plotDict,self.wavePointsPlotDict, self.plotToFreqIntMap = makeFigureqt(freqs,intens,abr.values,self.layout,'',wavePoints=None)
+        self.plotDict,self.wavePointsPlotDict, self.plotToFreqIntMap = makeFigureqt(freqs,intens,self.abr.values,self.layout,'',fs=self.fs,wavePoints=None)
         
         self.waveAnalysisWidget.p['Peak type'] = 'P1'
         self.loadWaveAnalysis()
@@ -285,6 +305,15 @@ class abrWindow(pg.GraphicsView):
         except FileNotFoundError:
             self.wavePoints = pd.DataFrame(columns=['Freq',	'Intensity','P1_x','P1_y','N1_x','N1_y','P2_x','P2_y','N2_x','N2_y','P3_x','P3_y','N3_x','N3_y','P4_x','P4_y','N4_x','N4_y'])
             print('Wave analysis not found')
+
+        try:
+            filename = os.path.splitext(self.currentFile)[0]+'_thresholds.csv'
+            self.threshDict = pd.read_csv(os.path.join(self.folder,filename)).dropna(axis=1).T.squeeze()
+            #Make sure the index is the correct format
+            self.threshDict.index = [str(int(float(el))) for el in self.threshDict.index]
+        except FileNotFoundError:  
+            self.threshDict = pd.Series([0]*len(self.frequencies),index=self.frequencies.astype(int).astype(str))
+            print('Thresholds not found')          
 
     def setActivePlot(self,row=0,col=0):
         
@@ -335,11 +364,13 @@ class abrWindow(pg.GraphicsView):
     def makeConnections(self):
         #p.keys()['Strain'].sigValueChanged.connect(changeStrainCb)
         self.p.keys()['Open file'].sigActivated.connect(self.openFileCb)
+        self.p.keys()['Reverse polarity'].sigValueChanged.connect(self.reversePolarityCb)
+        self.p.keys()['Set threshold'].sigActivated.connect(self.setThresholdCb)
         self.p.keys()['Save results'].sigActivated.connect(self.saveResultsCb)
         self.p.keys()['Guess Wave Peak positions'].sigActivated.connect(lambda: self.guessWavePoints('both'))
         self.p.keys()['Guess Wave Peak higher intensities'].sigActivated.connect(lambda: self.guessWavePoints('higher'))
         self.p.keys()[ 'Guess Wave Peak lower intensities'].sigActivated.connect(lambda: self.guessWavePoints('lower'))
-       
+
         self.waveAnalysisWidget.finishSignal.connect(self.retrieveResultsCb)
         self.waveAnalysisWidget.changeTraceSignal.connect(self.navigateTraces)
         self.waveAnalysisWidget.guessAboveSignal.connect(lambda: self.guessWavePoints('higher'))
@@ -360,10 +391,12 @@ class abrWindow(pg.GraphicsView):
             self.guessWavePoints("higher")
         elif ev.key() == Qt.Key_F:
             self.guessWavePoints("lower")
+        # elif ev.key() == Qt.Key_Z:
+        #     self.prevMouseCb()
+        # elif ev.key() == Qt.Key_X:
+        #     self.nextMouseCb()
         elif ev.key() == Qt.Key_Z:
-            self.prevMouseCb()
-        elif ev.key() == Qt.Key_X:
-            self.nextMouseCb()
+            self.setThresholdCb()
 
     def navigateTraces(self,a):
         row, col = self.activeRowCol
@@ -383,6 +416,10 @@ class abrWindow(pg.GraphicsView):
         self.wavePoints['Wave 1 amplitude (uV)'] = self.wavePoints['P1_y'] - self.wavePoints['N1_y']
         self.wavePoints['Wave 1 latency (ms)'] = self.wavePoints['P1_x']
         self.wavePoints.to_csv(os.path.join(self.folder,filename),index=False)
+
+        filename2 = os.path.splitext(self.currentFile)[0]+'_thresholds.csv'
+        self.threshDict.to_frame().T.to_csv(os.path.join(self.folder,filename2),index=None)
+        
 
     def retrieveResultsCb(self):
     
@@ -442,24 +479,25 @@ class abrWindow(pg.GraphicsView):
     
       
        
-        abr = at.extractABR(os.path.join(self.folder,self.currentFile))
+     #   abr = at.extractABR(os.path.join(self.folder,self.currentFile))
         #abr2 = at.extractABR(os.path.join(dataFolder,data.loc[data['ID']==dat,'Folder 2'].values[0]))
         #abr = pd.concat([abr,abr2])
         freqs = []
         intens = []
-        for el in abr.index:
+        for el in self.abr.index:
             freqs.append(el[0])
             intens.append(el[1])
 
-        frequencies2 =[ 100,3000,6000,12000,18000,24000,30000,36000,42000]
+      #  frequencies2 =np.array(np.sort(list(set(freqs))))#[ 100,3000,6000,12000,18000,24000,30000,36000,42000]
 
-        try:
-            self.threshDict = dict(zip(frequencies2,thresholds.loc[thresholds['MouseN - AGE']==str(dat)+' - '+str(self.p['Age'])+'month',frequencies].values[0])) 
-        except:
-            self.threshDict =  dict(zip(frequencies2,[0]*9))
+        #try:
+      #  self.threshDict = self.thresholds#dict(zip(frequencies2,self.thresholds[frequencies2.astype(str)].values[0])) 
+
+        #except:
+        #    self.threshDict =  dict(zip(frequencies2,[0]*9))
         
 
-        self.plotDict,self.wavePointsPlotDict, self.plotToFreqIntMap  = makeFigureqt(freqs,intens,abr.values,self.layout,'',plotDict=self.plotDict ,thresholds=self.threshDict,wavePoints=self.wavePoints,wavePointsPlotDict=self.wavePointsPlotDict)
+        self.plotDict,self.wavePointsPlotDict, self.plotToFreqIntMap  = makeFigureqt(freqs,intens,self.abr.values,self.layout,'',fs=self.fs,plotDict=self.plotDict ,thresholds=self.threshDict,wavePoints=self.wavePoints,wavePointsPlotDict=self.wavePointsPlotDict)
         self.titleLabel.setText(self.currentFile)
         self.highlightTraceAt(self.activeRowCol[0],self.activeRowCol[1],3)
 
@@ -501,8 +539,8 @@ class abrWindow(pg.GraphicsView):
     def guessWavePoints(self, direction = 'both'):
         
         freq,initialIntens = self.plotToFreqIntMap[self.activeRowCol]
-        threshold = self.threshDict[freq]
-
+        threshold = self.threshDict[str(int(freq))]
+        
         if direction == 'both':
             lowerLimit = threshold
             higherLimit = 100
@@ -531,16 +569,16 @@ class abrWindow(pg.GraphicsView):
                         points = {}
                         for peak in [1,2,3,4]:
                             try:
-                                initialGuess_x = int(initialWavePoints['P'+str(peak)+'_x'].values[0]*fs/1000)
+                                initialGuess_x = int(initialWavePoints['P'+str(peak)+'_x'].values[0]*self.fs/1000)
                                 guess_x = findNearestPeak(trace, initialGuess_x)    
-                                points['P'+str(peak)] = (guess_x/fs*1000,trace[guess_x])
+                                points['P'+str(peak)] = (guess_x/self.fs*1000,trace[guess_x])
                             except ValueError:
                                 points['P'+str(peak)] = (np.nan,np.nan)
 
                             try:
-                                initialGuess_x = int(initialWavePoints['N'+str(peak)+'_x'].values[0]*fs/1000)
+                                initialGuess_x = int(initialWavePoints['N'+str(peak)+'_x'].values[0]*self.fs/1000)
                                 guess_x = findNearestPeak(trace, initialGuess_x, negative=True  )
-                                points['N'+str(peak)] = (guess_x/fs*1000,trace[guess_x])
+                                points['N'+str(peak)] = (guess_x/self.fs*1000,trace[guess_x])
                             except ValueError:
                                 points['N'+str(peak)] = (np.nan,np.nan)
 
@@ -587,8 +625,14 @@ class abrWindow(pg.GraphicsView):
         self.updateCurrentPlotCb()
 
         #print(sc.items())
-
-
+    def setThresholdCb(self):
+        freq,initialIntens = self.plotToFreqIntMap[self.activeRowCol]
+        self.threshDict[str(int(freq))] = initialIntens
+        self.updateCurrentPlotCb()
+    def reversePolarityCb(self):
+        
+        self.abr = -self.abr
+        self.updateCurrentPlotCb()
 
 if __name__ == '__main__':
     win = abrWindow()
