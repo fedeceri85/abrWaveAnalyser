@@ -1,10 +1,7 @@
-from pylab import *
 import os
 import pandas as pd
 import numpy as np
 import pandas as pd
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 from sklearn.model_selection import learning_curve
 from scipy import signal, stats
 #Global variables

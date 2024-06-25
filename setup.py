@@ -8,7 +8,7 @@ Usage:
 from setuptools import setup
 
 APP = ['mainWindow.py']
-DATA_FILES = []
+DATA_FILES = ['libffi.8.dylib']
 OPTIONS = {}
 
 setup(
@@ -17,3 +17,6 @@ setup(
     options={'py2app': OPTIONS},
     setup_requires=['py2app'],
 )
+
+
+

@@ -24,7 +24,6 @@ app = _instance
 
 
 
-
 # frequencies = ['Click', '3 kHz', '6 kHz', '12 kHz', '18 kHz', '24 kHz',
 #        '30 kHz', '36 kHz', '42 kHz']
 intensitiesL = [str(x)+'dB' for x in range(0,100,5)]
@@ -205,6 +204,7 @@ class abrWindow(pg.GraphicsView):
             {'name':'Guess Wave Peak positions','type':'action'},
             {'name':'Guess Wave Peak higher intensities','type':'action'},
             {'name':'Guess Wave Peak lower intensities','type':'action'},
+            {'name':'ML','type':'action'},
             {'name':'Save results','type':'action'},            ]
 
 
@@ -370,6 +370,7 @@ class abrWindow(pg.GraphicsView):
         self.p.keys()['Guess Wave Peak positions'].sigActivated.connect(lambda: self.guessWavePoints('both'))
         self.p.keys()['Guess Wave Peak higher intensities'].sigActivated.connect(lambda: self.guessWavePoints('higher'))
         self.p.keys()[ 'Guess Wave Peak lower intensities'].sigActivated.connect(lambda: self.guessWavePoints('lower'))
+        self.p.keys()['ML'].sigActivated.connect(self.MLGuessCB)
 
         self.waveAnalysisWidget.finishSignal.connect(self.retrieveResultsCb)
         self.waveAnalysisWidget.changeTraceSignal.connect(self.navigateTraces)
@@ -632,6 +633,46 @@ class abrWindow(pg.GraphicsView):
     def reversePolarityCb(self):
         
         self.abr = -self.abr
+        self.updateCurrentPlotCb()
+    
+    def MLGuessCB(self):
+
+        import pickle
+        m1model = pickle.load(open('./models/Wave1LatencyModel.pkl','rb'))
+        m2model = pickle.load(open('./models/Wave1m2xModel.pkl','rb'))
+
+        for freq in self.frequencies:
+            abr = self.abr.loc[freq]
+            m1x = m1model.predict(abr.values)
+            m2x = m2model.predict(abr.values)*1000
+
+
+            ii = 0
+            for j,el in abr.iterrows():
+                if j>= self.threshDict[str(int(freq))]:
+                    selectedWavePoints = self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==j) ]
+                    trace = el.values
+                    #Adjust values on a maximum minimum
+                    m1 = findNearestPeak(trace,int(m1x[ii]*self.fs/1000),50)
+                    m2 = findNearestPeak(trace,int(m2x[ii]*self.fs/1000),50,negative=True)
+                    if selectedWavePoints.shape[0] ==0:
+
+                        row = pd.DataFrame({
+                            'Freq':freq,
+                            'Intensity':j,
+                            'P1_x':m1/self.fs*1000,
+                            'P1_y' : el.values[m1],
+                            'N1_x':m2/self.fs*1000,
+                            'N1_y' : el.values[m2],
+                        },index=[0])
+                        self.wavePoints = pd.concat([self.wavePoints,row],ignore_index=True)
+                    else:
+                        self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==j) ,'P1_x'] = m1/self.fs*1000
+                        self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==j) ,'N1_x'] = m2/self.fs*1000
+                        self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==j) ,'P1_y'] = el.values[m1]
+                        self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==j) ,'N1_y'] = el.values[m2]
+                ii = ii+1
+
         self.updateCurrentPlotCb()
 
 if __name__ == '__main__':
