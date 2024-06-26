@@ -53,7 +53,7 @@ frequenciesDict = {
 # thresholds['Strain'] = strain
 # dates = data['ID'].unique()
 
-def makeFigureqt(h1,h2,out,layout,title,fs,wavePoints = None,plotDict = None,wavePointsPlotDict = None,thresholds = None):
+def makeFigureqt(h1,h2,out,layout,title,fs,wavePoints = None,plotDict = None,wavePointsPlotDict = None,thresholds = None,xlim=8):
     '''
     Make a figure from ABR trace data using pyqtgraph. Modifies an existing figure if the pyqtgraphs plots are passed through plotDict
     '''
@@ -111,7 +111,7 @@ def makeFigureqt(h1,h2,out,layout,title,fs,wavePoints = None,plotDict = None,wav
             p2.hideAxis('right')
             p2.hideAxis('bottom')
             #p2.setYRange(ymin,ymax,padding = 0.1)
-            p2.setXRange(0,10,padding = 0)
+            p2.setXRange(0,xlim,padding = 0)
             
             plots[plotID] = pl
             p2.setObjectName(plotID)
@@ -123,7 +123,7 @@ def makeFigureqt(h1,h2,out,layout,title,fs,wavePoints = None,plotDict = None,wav
                 pl.setData(time,np.array(out)[i,:],pen=linecol)
 
                # pl.setPen(pg.mkPen(linecol,width=5))    
-                layout.getItem(nint-row-1,column).setXRange(0,10,padding = 0)
+                layout.getItem(nint-row-1,column).setXRange(0,xlim,padding = 0)
 
             except KeyError:
                 p2 = layout.addPlot(nint-row-1,column)
@@ -134,7 +134,7 @@ def makeFigureqt(h1,h2,out,layout,title,fs,wavePoints = None,plotDict = None,wav
                 p2.hideAxis('right')
                 p2.hideAxis('bottom')
                 #p2.setYRange(ymin,ymax,padding = 0)
-                p2.setXRange(0,10,padding = 0)
+                p2.setXRange(0,xlim,padding = 0)
                
                 plots[plotID] = pl
                 p2.setObjectName(plotID)
@@ -205,15 +205,20 @@ class abrWindow(pg.GraphicsView):
             {'name':'Guess Wave Peak higher intensities','type':'action'},
             {'name':'Guess Wave Peak lower intensities','type':'action'},
             {'name':'ML Wave 1 (experimental)','type':'action'},
-             {'name':'ML threshold (experimental)','type':'action'},
-            {'name':'Save results','type':'action'},            ]
+            {'name':'ML threshold (experimental)','type':'action'},
+            {'name':'X-axis lim (ms)','type':'float','value':8.0},
 
+            {'name':'Save results','type':'action'},                        
+
+            ]
+            
+    
 
         ## Create tree of Parameter objects
         self.p = Parameter.create(name='params', type='group', children=params)
         self.t = ParameterTree()
         self.t.setParameters(self.p, showTop=False)
-        self.t.setGeometry(1300,800,300,200)
+        self.t.setGeometry(1300,800,300,400)
 
 
         self.waveAnalysisWidget = myGLW(show=True)
@@ -248,7 +253,11 @@ class abrWindow(pg.GraphicsView):
             for dirpath, dirnames, filenames in os.walk(self.folder):
                 for filename in filenames:
                     if (prefix in filename) and ('_waveAnalysisResults' not in filename) and ('_thresholds' not in filename):
-                        files.append(filename)
+                        f = open(os.path.join(self.folder,filename), encoding='unicode_escape')
+                        l = f.readlines()
+                        if l[0].startswith(':RUN'):
+                            files.append(filename)
+                        f.close()
             files.sort()
             self.abr,self.fs = at.extractABRDS(files,folder=self.folder)
             self.currentFile = prefix
@@ -291,7 +300,7 @@ class abrWindow(pg.GraphicsView):
        # self.wavePoints = pd.DataFrame(columns=['Freq',	'Intensity','P1_x','P1_y','N1_x','N1_y','P2_x','P2_y','N2_x','N2_y','P3_x','P3_y','N3_x','N3_y','P4_x','P4_y','N4_x','N4_y'])
 
 
-        self.plotDict,self.wavePointsPlotDict, self.plotToFreqIntMap = makeFigureqt(freqs,intens,self.abr.values,self.layout,'',fs=self.fs,wavePoints=None)
+        self.plotDict,self.wavePointsPlotDict, self.plotToFreqIntMap = makeFigureqt(freqs,intens,self.abr.values,self.layout,'',fs=self.fs,wavePoints=None,xlim=self.p['X-axis lim (ms)'])
         
         self.waveAnalysisWidget.p['Peak type'] = 'P1'
         self.loadWaveAnalysis()
@@ -373,6 +382,7 @@ class abrWindow(pg.GraphicsView):
         self.p.keys()[ 'Guess Wave Peak lower intensities'].sigActivated.connect(lambda: self.guessWavePoints('lower'))
         self.p.keys()['ML Wave 1 (experimental)'].sigActivated.connect(self.MLGuessCB)
         self.p.keys()['ML threshold (experimental)'].sigActivated.connect(self.MLGuessThresholdsCb)
+        self.p.keys()['X-axis lim (ms)'].sigValueChanged.connect(self.changeXlimCb)
 
         self.waveAnalysisWidget.finishSignal.connect(self.retrieveResultsCb)
         self.waveAnalysisWidget.changeTraceSignal.connect(self.navigateTraces)
@@ -500,7 +510,7 @@ class abrWindow(pg.GraphicsView):
         #    self.threshDict =  dict(zip(frequencies2,[0]*9))
         
 
-        self.plotDict,self.wavePointsPlotDict, self.plotToFreqIntMap  = makeFigureqt(freqs,intens,self.abr.values,self.layout,'',fs=self.fs,plotDict=self.plotDict ,thresholds=self.threshDict,wavePoints=self.wavePoints,wavePointsPlotDict=self.wavePointsPlotDict)
+        self.plotDict,self.wavePointsPlotDict, self.plotToFreqIntMap  = makeFigureqt(freqs,intens,self.abr.values,self.layout,'',fs=self.fs,plotDict=self.plotDict ,thresholds=self.threshDict,wavePoints=self.wavePoints,wavePointsPlotDict=self.wavePointsPlotDict,xlim=self.p['X-axis lim (ms)'])
         self.titleLabel.setText(self.currentFile)
         self.highlightTraceAt(self.activeRowCol[0],self.activeRowCol[1],3)
 
@@ -697,7 +707,9 @@ class abrWindow(pg.GraphicsView):
             self.threshDict[str(int(freq))] = thresh
         self.updateCurrentPlotCb()
             
-
+    def changeXlimCb(self):
+        self.updateCurrentPlotCb()
+        self.waveAnalysisWidget.p1.setXRange(0,self.p['X-axis lim (ms)'])
 
 if __name__ == '__main__':
     win = abrWindow()

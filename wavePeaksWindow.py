@@ -209,7 +209,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         self.p = Parameter.create(name='params', type='group', children=params)
         self.t = ParameterTree()
         self.t.setParameters(self.p, showTop=False)
-        self.t.setGeometry(1600,800,300,300)
+        self.t.setGeometry(1600,800,300,400)
         self.t.show()
 
     def makeConnections(self):
