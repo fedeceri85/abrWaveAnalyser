@@ -204,7 +204,8 @@ class abrWindow(pg.GraphicsView):
             {'name':'Guess Wave Peak positions','type':'action'},
             {'name':'Guess Wave Peak higher intensities','type':'action'},
             {'name':'Guess Wave Peak lower intensities','type':'action'},
-            {'name':'ML','type':'action'},
+            {'name':'ML Wave 1 (experimental)','type':'action'},
+             {'name':'ML threshold (experimental)','type':'action'},
             {'name':'Save results','type':'action'},            ]
 
 
@@ -370,7 +371,8 @@ class abrWindow(pg.GraphicsView):
         self.p.keys()['Guess Wave Peak positions'].sigActivated.connect(lambda: self.guessWavePoints('both'))
         self.p.keys()['Guess Wave Peak higher intensities'].sigActivated.connect(lambda: self.guessWavePoints('higher'))
         self.p.keys()[ 'Guess Wave Peak lower intensities'].sigActivated.connect(lambda: self.guessWavePoints('lower'))
-        self.p.keys()['ML'].sigActivated.connect(self.MLGuessCB)
+        self.p.keys()['ML Wave 1 (experimental)'].sigActivated.connect(self.MLGuessCB)
+        self.p.keys()['ML threshold (experimental)'].sigActivated.connect(self.MLGuessThresholdsCb)
 
         self.waveAnalysisWidget.finishSignal.connect(self.retrieveResultsCb)
         self.waveAnalysisWidget.changeTraceSignal.connect(self.navigateTraces)
@@ -634,6 +636,7 @@ class abrWindow(pg.GraphicsView):
         
         self.abr = -self.abr
         self.updateCurrentPlotCb()
+        self.setActivePlot(self.activeRowCol[0],self.activeRowCol[1])
     
     def MLGuessCB(self):
 
@@ -644,7 +647,7 @@ class abrWindow(pg.GraphicsView):
         for freq in self.frequencies:
             abr = self.abr.loc[freq]
             m1x = m1model.predict(abr.values)
-            m2x = m2model.predict(abr.values)*1000
+            m2x = m2model.predict(abr.values)
 
 
             ii = 0
@@ -653,8 +656,8 @@ class abrWindow(pg.GraphicsView):
                     selectedWavePoints = self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==j) ]
                     trace = el.values
                     #Adjust values on a maximum minimum
-                    m1 = findNearestPeak(trace,int(m1x[ii]*self.fs/1000),50)
-                    m2 = findNearestPeak(trace,int(m2x[ii]*self.fs/1000),50,negative=True)
+                    m1 = findNearestPeak(trace,int(m1x[ii]),50)
+                    m2 = findNearestPeak(trace,int(m2x[ii]),50,negative=True)
                     if selectedWavePoints.shape[0] ==0:
 
                         row = pd.DataFrame({
@@ -674,6 +677,27 @@ class abrWindow(pg.GraphicsView):
                 ii = ii+1
 
         self.updateCurrentPlotCb()
+        self.setActivePlot(self.activeRowCol[0],self.activeRowCol[1])
+    
+    def MLGuessThresholdsCb(self):
+        import pickle
+        model = pickle.load(open('./models/ThresholdModel.pkl','rb'))
+        print('Threshold predictions\n')
+        for freq in self.frequencies:
+            abr = self.abr.loc[freq]
+            thresholds = model.predict(abr)
+            #Define the threshold as the lowest predicted as threshold
+            aboveThresh = abr.index[thresholds==1]
+            if aboveThresh.size>1:
+                thresh = min(aboveThresh)
+                print(freq,min(aboveThresh))
+            else:
+                thresh = max(abr.index)+5
+                print(freq,max(abr.index)+5)
+            self.threshDict[str(int(freq))] = thresh
+        self.updateCurrentPlotCb()
+            
+
 
 if __name__ == '__main__':
     win = abrWindow()
