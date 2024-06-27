@@ -93,7 +93,7 @@ def extractABR(filename,removeDuplicates = True,saveConverted=False):
     fs = 195000.0/2.0 #So far this is the frequency of all our files.
     return pdOut,fs
 
-def extractABRDS(filenames,folder='.'):
+def extractABRDS(filenames,folder='.',removeDuplicates=True):
     '''
     Extract ABR data from csv files (Dwayne Simmons Lab - Lieberman system)
     '''
@@ -129,8 +129,14 @@ def extractABRDS(filenames,folder='.'):
             raise NotImplementedError('All the traces should have the same sampling frequency')
         else:
             fs = fss[0]
-        
-    return pd.concat(out),fs
+    pdOut = pd.concat(out)
+
+    if removeDuplicates: # remove duplicated data
+        t2 = pdOut.reset_index()
+        pdOut['levels']=(t2['level_0'].astype(str)+'_'+t2['level_1'].astype(str)).values
+        pdOut.drop_duplicates(keep='last',subset='levels',inplace=True)
+        pdOut.drop('levels',inplace=True,axis=1)
+    return pdOut,fs
 
 def makeFigure(h1,h2,out,title,thresholds = None):
     '''

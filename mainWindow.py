@@ -194,13 +194,23 @@ class abrWindow(pg.GraphicsView):
 
         self.setWindowTitle('ABR Wave Analysis - Sheffield Hearing research group') 
         self.setGeometry(0,0,1300,1000)
+        self.move(0,0)
 
+
+        screen = QApplication.primaryScreen()
+        print('Screen: %s' % screen.name())
+        size = screen.size()
+        print('Size: %d x %d' % (size.width(), size.height()))
+        rect = screen.availableGeometry()
+        print('Available: %d x %d' % (rect.width(), rect.height()))
+        self.resize(int(rect.width()*0.66),rect.height())
 
         params = [
         # {'name':'Strain','type':'list','values':['6N','Repaired']},
             {'name':'Open file','type':'action'},
             {'name':'Reverse polarity','type':'bool','value':False},
             {'name':'Set threshold','type':'action'},
+            {'name':'Set no threshold','type':'action'},
             {'name':'Guess Wave Peak positions','type':'action'},
             {'name':'Guess Wave Peak higher intensities','type':'action'},
             {'name':'Guess Wave Peak lower intensities','type':'action'},
@@ -218,13 +228,16 @@ class abrWindow(pg.GraphicsView):
         self.p = Parameter.create(name='params', type='group', children=params)
         self.t = ParameterTree()
         self.t.setParameters(self.p, showTop=False)
-        self.t.setGeometry(1300,800,300,400)
-
+        self.t.move(int(rect.width()*0.66),int(rect.height()/1.4))
+        self.t.resize(int(rect.width()*0.34/2),int(rect.height()/2.5))
 
         self.waveAnalysisWidget = myGLW(show=True)
-
+        self.waveAnalysisWidget.move(int(rect.width()*0.66),0)
+        self.waveAnalysisWidget.resize(int(rect.width()*0.34),int(rect.height()/2))
 
         self.activeRowCol = (0,0)
+        self.waveAnalysisWidget.t.move(int(rect.width()*0.66+rect.width()*0.34/2),int(rect.height()/1.7))
+        self.waveAnalysisWidget.t.resize(int(rect.width()*0.34/2),int(rect.height()/2.5))
 
         self.makeConnections()
         self.show()
@@ -376,6 +389,7 @@ class abrWindow(pg.GraphicsView):
         self.p.keys()['Open file'].sigActivated.connect(self.openFileCb)
         self.p.keys()['Reverse polarity'].sigValueChanged.connect(self.reversePolarityCb)
         self.p.keys()['Set threshold'].sigActivated.connect(self.setThresholdCb)
+        self.p.keys()['Set no threshold'].sigActivated.connect(self.setAboveThresholdCb)
         self.p.keys()['Save results'].sigActivated.connect(self.saveResultsCb)
         self.p.keys()['Guess Wave Peak positions'].sigActivated.connect(lambda: self.guessWavePoints('both'))
         self.p.keys()['Guess Wave Peak higher intensities'].sigActivated.connect(lambda: self.guessWavePoints('higher'))
@@ -642,6 +656,18 @@ class abrWindow(pg.GraphicsView):
         freq,initialIntens = self.plotToFreqIntMap[self.activeRowCol]
         self.threshDict[str(int(freq))] = initialIntens
         self.updateCurrentPlotCb()
+
+    def setAboveThresholdCb(self):
+        freqs = []
+        intens = []
+        for el in self.abr.index:
+            freqs.append(el[0])
+            intens.append(el[1])
+
+        freq,initialIntens = self.plotToFreqIntMap[self.activeRowCol]
+        self.threshDict[str(int(freq))] = max(intens)+5
+        self.updateCurrentPlotCb()
+
     def reversePolarityCb(self):
         
         self.abr = -self.abr
@@ -696,14 +722,28 @@ class abrWindow(pg.GraphicsView):
         for freq in self.frequencies:
             abr = self.abr.loc[freq]
             thresholds = model.predict(abr)
+            thresholdProba = model.predict_proba(abr)[:,1]
+            # print(thresholdProba)
+            # print(abr.index)
+            # print(thresholds)
             #Define the threshold as the lowest predicted as threshold
             aboveThresh = abr.index[thresholds==1]
+            belowThresh = abr.index[thresholds==0]
+
+            aboveThreshProba = thresholdProba[thresholds==1]
+            belowThreshProba = thresholdProba[thresholds==0]
+
             if aboveThresh.size>1:
                 thresh = min(aboveThresh)
-                print(freq,min(aboveThresh))
+                threshprob = aboveThreshProba[np.argmin(aboveThresh)]
+                threshProbaNext = aboveThreshProba[np.argpartition(aboveThresh,1)][1]
+                threshProbaPrev = belowThreshProba[np.argmax(belowThresh)]
+
+                print(freq,' Threshold:',thresh,' Probability: ',threshprob*100,'% (Previous lvl:',threshProbaPrev*100,'%; next lvl:',threshProbaNext*100,'%)')
             else:
+                threshProbaPrev = belowThreshProba[np.argmax(belowThresh)]
                 thresh = max(abr.index)+5
-                print(freq,max(abr.index)+5)
+                print(freq,max(abr.index)+5,'(Previous lvl:',threshProbaPrev*100,'%)' )
             self.threshDict[str(int(freq))] = thresh
         self.updateCurrentPlotCb()
             
