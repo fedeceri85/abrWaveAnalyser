@@ -692,8 +692,8 @@ class abrWindow(pg.GraphicsView):
                     selectedWavePoints = self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==j) ]
                     trace = el.values
                     #Adjust values on a maximum minimum
-                    m1 = findNearestPeak(trace,int(m1x[ii]),50)
-                    m2 = findNearestPeak(trace,int(m2x[ii]),50,negative=True)
+                    m1 = findNearestPeak(trace,int(m1x[ii]),30)
+                    m2 = findNearestPeak(trace,int(m2x[ii]),30,negative=True)
                     if selectedWavePoints.shape[0] ==0:
 
                         row = pd.DataFrame({

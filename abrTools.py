@@ -101,7 +101,11 @@ def extractABRDS(filenames,folder='.',removeDuplicates=True):
     fss = []
     for filename in filenames:
         print(filename)
-        df = pd.read_csv(os.path.join(folder,filename), encoding='unicode_escape',sep='\t',skiprows=5,header=0).reset_index()  
+        try:
+            df = pd.read_csv(os.path.join(folder,filename), encoding='unicode_escape',sep='\t',skiprows=5,header=0).reset_index()  
+        except pd.errors.ParserError:
+            df = pd.read_csv(os.path.join(folder,filename), encoding='unicode_escape',sep='\t',skiprows=6,header=0).reset_index()  
+
         f = open(os.path.join(folder,filename), encoding='unicode_escape')
         l = f.readlines()
         for line in l:
