@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import learning_curve
 from scipy import signal, stats
+import io
+
 #Global variables
 frequencies = [100,3000,6000,12000,18000,24000,30000,36000,42000]
 lowestInt = 15 # dB
@@ -93,6 +95,7 @@ def extractABR(filename,removeDuplicates = True,saveConverted=False):
     fs = 195000.0/2.0 #So far this is the frequency of all our files.
     return pdOut,fs
 
+
 def extractABRDS(filenames,folder='.',removeDuplicates=True):
     '''
     Extract ABR data from csv files (Dwayne Simmons Lab - Lieberman system)
@@ -101,10 +104,31 @@ def extractABRDS(filenames,folder='.',removeDuplicates=True):
     fss = []
     for filename in filenames:
         print(filename)
-        try:
-            df = pd.read_csv(os.path.join(folder,filename), encoding='unicode_escape',sep='\t',skiprows=5,header=0).reset_index()  
-        except pd.errors.ParserError:
-            df = pd.read_csv(os.path.join(folder,filename), encoding='unicode_escape',sep='\t',skiprows=6,header=0).reset_index()  
+        #Determine how many lines to skip
+        f = open(os.path.join(folder,filename),'r', encoding='unicode_escape')
+        lines = f.readlines()
+        skiprows = None
+        for j,l in enumerate(lines):
+            if l.startswith(':DATA'):
+                skiprows = j
+        f.close() 
+        print('Lines to skip:',skiprows)  
+        try:    
+            df = pd.read_csv(os.path.join(folder,filename), encoding='unicode_escape',sep='\t',skiprows=skiprows,header=0).reset_index()
+        except pd.errors.ParserError:  
+            #some files require cleaning before loading
+            f = open(os.path.join(folder,filename),'r',encoding='unicode_escape')
+            lines = f.readlines()
+            f.close()
+
+            lines2 = [l[:-1] for l in lines[skiprows:]] #remove the final escape character that sometimes is misinterpreted
+            stream = io.StringIO("\n".join(lines2))
+            df = pd.read_csv(stream,sep='\t',skiprows=0,header=0).reset_index()
+        print(df)
+        # try:
+        #     df = pd.read_csv(os.path.join(folder,filename), encoding='unicode_escape',sep='\t',skiprows=5,header=0).reset_index()  
+        # except pd.errors.ParserError:
+        #     df = pd.read_csv(os.path.join(folder,filename), encoding='unicode_escape',sep='\t',skiprows=6,header=0).reset_index()  
 
         f = open(os.path.join(folder,filename), encoding='unicode_escape')
         l = f.readlines()
