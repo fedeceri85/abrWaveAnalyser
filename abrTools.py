@@ -112,7 +112,7 @@ def extractABRDS(filenames,folder='.',removeDuplicates=True):
             if l.startswith(':DATA'):
                 skiprows = j
         f.close() 
-        print('Lines to skip:',skiprows)  
+       # print('Lines to skip:',skiprows)  
         try:    
             df = pd.read_csv(os.path.join(folder,filename), encoding='unicode_escape',sep='\t',skiprows=skiprows,header=0).reset_index()
         except pd.errors.ParserError:  
@@ -124,7 +124,7 @@ def extractABRDS(filenames,folder='.',removeDuplicates=True):
             lines2 = [l[:-1] for l in lines[skiprows:]] #remove the final escape character that sometimes is misinterpreted
             stream = io.StringIO("\n".join(lines2))
             df = pd.read_csv(stream,sep='\t',skiprows=0,header=0).reset_index()
-        print(df)
+       # print(df)
         # try:
         #     df = pd.read_csv(os.path.join(folder,filename), encoding='unicode_escape',sep='\t',skiprows=5,header=0).reset_index()  
         # except pd.errors.ParserError:
