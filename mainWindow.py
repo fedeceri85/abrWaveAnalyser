@@ -738,6 +738,10 @@ class abrWindow(pg.GraphicsView):
                 threshprob = aboveThreshProba[np.argmin(aboveThresh)]
                 threshProbaNext = aboveThreshProba[np.argpartition(aboveThresh,1)][1]
                 threshProbaPrev = belowThreshProba[np.argmax(belowThresh)]
+                # thresh = max(belowThresh)
+                # threshprob = belowThreshProba[np.argmax(belowThresh)]
+                # threshProbaNext = aboveThreshProba[np.argmin(aboveThresh)]
+                # threshProbaPrev = np.nan
 
                 print(freq,' Threshold:',thresh,' Probability: ',threshprob*100,'% (Previous lvl:',threshProbaPrev*100,'%; next lvl:',threshProbaNext*100,'%)')
             else:
