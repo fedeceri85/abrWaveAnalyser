@@ -1,5 +1,6 @@
 from PyQt5.Qt import QApplication
 from PyQt5.QtCore import Qt
+from PyQt5 import QtGui,QtWidgets
 from pyqtgraph.parametertree import Parameter, ParameterTree
 import numpy as np
 import sys
@@ -11,6 +12,13 @@ from pyqtgraph.Qt import QtCore,QtWidgets
 from wavePeaksWindow import myGLW, findNearestPeak
 import pandas as pd
 import itertools
+
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+import matplotlib.pyplot as plt
+
+import seaborn as sns
+tips = sns.load_dataset("tips")
+
 # Set white graph
 pg.setConfigOptions(antialias=True)
 pg.setConfigOption('background', 'w')
@@ -188,6 +196,55 @@ def wavePointsToScatter(wavePoints):
     y = wavePoints[ylabels].values[0,:]
     return (x,y)
 
+class resultWindow(QtWidgets.QMainWindow):
+    def __init__(self, wavepoints):
+        super().__init__()
+
+        self.setWindowTitle('ABR Wave Analysis - Results') 
+        self.setGeometry(0,0,1300,1000)
+        self.move(2500,0)   
+        self.main_widget = QtWidgets.QWidget(self)
+
+        wavepoints2 = wavepoints.copy()
+        wavepoints2['Latency (ms)'] = wavepoints2['P1_x']
+        wavepoints2['Amplitude (uV)'] = np.abs(wavepoints2['P1_y']-wavepoints2['N1_y'])
+        fg = sns.relplot(data=wavepoints2,x='Intensity',y='Latency (ms)',col='Freq')
+        self.fig = fg.figure
+        self.fig.tight_layout()
+
+        self.canvas = FigureCanvas(self.fig)
+
+        fg2 = sns.relplot(data=wavepoints2,x='Intensity',y='Amplitude (uV)',col='Freq')
+        
+        self.fig2 = fg2.figure
+        self.fig2.tight_layout()
+        self.canvas2 = FigureCanvas(self.fig2)
+
+        self.canvas.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                       QtWidgets.QSizePolicy.Expanding)
+        self.canvas.updateGeometry()
+
+        self.canvas2.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                       QtWidgets.QSizePolicy.Expanding)
+        self.canvas2.updateGeometry()
+        # self.button = QtWidgets.QPushButton("Button")
+        # self.label = QtWidgets.QLabel("A plot:")
+
+        self.layout = QtWidgets.QGridLayout(self.main_widget)
+        # self.layout.addWidget(self.button)
+        # self.layout.addWidget(self.label)
+        self.layout.addWidget(self.canvas)
+        self.layout.addWidget(self.canvas2)
+        self.setCentralWidget(self.main_widget)
+
+    def seabornplot(self):
+        # g = sns.FacetGrid(tips, col="sex", hue="time", palette="Set1",
+        #                             hue_order=["Dinner", "Lunch"])
+        # g.map(plt.scatter, "total_bill", "tip", edgecolor="w")
+        g = sns.catplot(data=tips,x='total_bill',y='tip',col="sex", hue="time", palette="Set1",
+                                    hue_order=["Dinner", "Lunch"])
+        return g.figure
+
 class abrWindow(pg.GraphicsView):
     def __init__(self, parent=None, useOpenGL=None, background='default'):
         super().__init__(parent, useOpenGL, background)
@@ -217,7 +274,7 @@ class abrWindow(pg.GraphicsView):
             {'name':'ML Wave 1 (experimental)','type':'action'},
             {'name':'ML threshold (experimental)','type':'action'},
             {'name':'X-axis lim (ms)','type':'float','value':8.0},
-
+            {'name':'Plot results','type':'action'},                        
             {'name':'Save results','type':'action'},                        
 
             ]
@@ -242,7 +299,6 @@ class abrWindow(pg.GraphicsView):
         self.makeConnections()
         self.show()
         self.t.show()
-       
 
     def openFileCb(self):
         dlg = pg.widgets.FileDialog.FileDialog()
@@ -336,7 +392,7 @@ class abrWindow(pg.GraphicsView):
             self.threshDict.index = [str(int(float(el))) for el in self.threshDict.index]
         except FileNotFoundError:  
             self.threshDict = pd.Series([0]*len(self.frequencies),index=self.frequencies.astype(int).astype(str))
-            print('Thresholds not found')          
+            print('Thresholds not found')         
 
     def setActivePlot(self,row=0,col=0):
         
@@ -391,6 +447,7 @@ class abrWindow(pg.GraphicsView):
         self.p.keys()['Set threshold'].sigActivated.connect(self.setThresholdCb)
         self.p.keys()['Set no threshold'].sigActivated.connect(self.setAboveThresholdCb)
         self.p.keys()['Save results'].sigActivated.connect(self.saveResultsCb)
+        self.p.keys()['Plot results'].sigActivated.connect(self.plotResultsCb)
         self.p.keys()['Guess Wave Peak positions'].sigActivated.connect(lambda: self.guessWavePoints('both'))
         self.p.keys()['Guess Wave Peak higher intensities'].sigActivated.connect(lambda: self.guessWavePoints('higher'))
         self.p.keys()[ 'Guess Wave Peak lower intensities'].sigActivated.connect(lambda: self.guessWavePoints('lower'))
@@ -528,7 +585,13 @@ class abrWindow(pg.GraphicsView):
         self.titleLabel.setText(self.currentFile)
         self.highlightTraceAt(self.activeRowCol[0],self.activeRowCol[1],3)
 
-    
+
+        
+    def plotResultsCb(self):
+        self.resultPlot = resultWindow(wavepoints=self.wavePoints)
+        self.resultPlot.show()
+       
+
     def onMouseClicked(self,evt):
         if evt.double():
             pass#
@@ -675,7 +738,7 @@ class abrWindow(pg.GraphicsView):
         self.setActivePlot(self.activeRowCol[0],self.activeRowCol[1])
     
     def MLGuessCB(self):
-
+ 
         import pickle
         m1model = pickle.load(open('./models/Wave1LatencyModel.pkl','rb'))
         m2model = pickle.load(open('./models/Wave1m2xModel.pkl','rb'))
