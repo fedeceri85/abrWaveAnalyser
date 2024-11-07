@@ -2,8 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import learning_curve
-from scipy import signal, stats
+from scipy import signal
 import io
 
 #Global variables
@@ -19,10 +18,23 @@ fs = 195000.0/2.0 # Acquisition sampling rate
 
 
 def extractABR(filename,removeDuplicates = True,saveConverted=False):
-    '''
-    Extract ABR data from csv files (output of Biosig)
-    If saveConverted, the converted file is saved as an ordered csv file in the same folder
-    '''
+    """
+    Extract ABR (Auditory Brainstem Response) data from CSV files (output of Biosig).
+    Parameters:
+    filename (str): The path to the CSV file containing the ABR data.
+    removeDuplicates (bool, optional): If True, removes duplicated data. Defaults to True.
+    saveConverted (bool, optional): If True, saves the converted file as an ordered CSV file in the same folder. Defaults to False.
+    Returns:
+    tuple: A tuple containing:
+        - pdOut (pd.DataFrame): A DataFrame containing the extracted ABR data.
+        - fs (float): The sampling frequency of the data.
+    Notes:
+    - The function reads the CSV file, processes the data, and optionally saves the converted data.
+    - If an error occurs during reading, it assumes the file is already converted and reads it as a DataFrame.
+    - The function removes duplicated data if `removeDuplicates` is set to True.
+    - The sampling frequency is hardcoded to 195000.0 / 2.0 Hz.
+    """
+
     try:
         f = open(filename,'r')
         l = f.readlines()
