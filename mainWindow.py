@@ -202,7 +202,10 @@ class resultWindow(QtWidgets.QMainWindow):
 
         self.setWindowTitle('ABR Wave Analysis - Results') 
         self.setGeometry(0,0,1300,1000)
-        self.move(2500,0)   
+        # Center the window on the screen
+        screen = QApplication.primaryScreen().geometry()
+        self.move(screen.center().x() - self.width()//2,
+                 screen.center().y() - self.height()//2)
         self.main_widget = QtWidgets.QWidget(self)
 
         wavepoints2 = wavepoints.copy()
