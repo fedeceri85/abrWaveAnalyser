@@ -278,6 +278,7 @@ class abrWindow(pg.GraphicsView):
             {'name':'ML threshold (experimental)','type':'action'},
             {'name':'X-axis lim (ms)','type':'float','value':8.0},
             {'name':'Plot results','type':'action'},                        
+            {'name':'Save ABR traces','type':'action'},                        
             {'name':'Save results','type':'action'},                        
 
             ]
@@ -457,6 +458,7 @@ class abrWindow(pg.GraphicsView):
         self.p.keys()['ML Wave 1 (experimental)'].sigActivated.connect(self.MLGuessCB)
         self.p.keys()['ML threshold (experimental)'].sigActivated.connect(self.MLGuessThresholdsCb)
         self.p.keys()['X-axis lim (ms)'].sigValueChanged.connect(self.changeXlimCb)
+        self.p.keys()['Save ABR traces'].sigActivated.connect(self.saveABRTracesCb)
 
         self.waveAnalysisWidget.finishSignal.connect(self.retrieveResultsCb)
         self.waveAnalysisWidget.changeTraceSignal.connect(self.navigateTraces)
@@ -816,7 +818,17 @@ class abrWindow(pg.GraphicsView):
                 print(freq,max(abr.index)+5,'(Previous lvl:',threshProbaPrev*100,'%)' )
             self.threshDict[str(int(freq))] = thresh
         self.updateCurrentPlotCb()
-            
+    
+    def saveABRTracesCb(self,_):
+        dlg = QtWidgets.QFileDialog()
+        dlg.setFileMode(QtWidgets.QFileDialog.Directory)
+
+        if dlg.exec_():
+            folder = dlg.selectedFiles()[0]
+            # Save to csv
+            filename = os.path.join(folder, os.path.splitext(self.currentFile)[0] + 'converted.csv')
+            self.abr.to_csv(filename)
+
     def changeXlimCb(self):
         self.updateCurrentPlotCb()
         self.waveAnalysisWidget.p1.setXRange(0,self.p['X-axis lim (ms)'])
