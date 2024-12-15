@@ -197,7 +197,11 @@ def wavePointsToScatter(wavePoints):
     return (x,y)
 
 class resultWindow(QtWidgets.QMainWindow):
-    def __init__(self, wavepoints):
+    def __init__(self, wavepoints,group=None,kind='scatter'):
+        '''
+        Kind can be 'scatter' or 'line'
+        '''
+
         super().__init__()
 
         self.setWindowTitle('ABR Wave Analysis - Results') 
@@ -211,14 +215,29 @@ class resultWindow(QtWidgets.QMainWindow):
         wavepoints2 = wavepoints.copy()
         wavepoints2['Latency (ms)'] = wavepoints2['P1_x']
         wavepoints2['Amplitude (uV)'] = np.abs(wavepoints2['P1_y']-wavepoints2['N1_y'])
-        fg = sns.relplot(data=wavepoints2,x='Intensity',y='Latency (ms)',col='Freq')
+        fg = sns.relplot(data=wavepoints2,x='Intensity',y='Latency (ms)',col='Freq',hue=group,kind=kind)
+        # Superimpose a scatter plot using seaborn
+        if kind == 'line':
+            for ax in fg.axes.flat:
+                freq = float(ax.get_title().split(' = ')[1])
+                data = wavepoints2[wavepoints2['Freq'] == freq]
+                sns.scatterplot(data=data, x='Intensity', y='Latency (ms)', hue=group, style='MouseID', ax=ax, legend=False)
+
+#                ax.get_legend().remove()
+
         self.fig = fg.figure
         self.fig.tight_layout()
-
+        
         self.canvas = FigureCanvas(self.fig)
 
-        fg2 = sns.relplot(data=wavepoints2,x='Intensity',y='Amplitude (uV)',col='Freq')
-        
+        fg2 = sns.relplot(data=wavepoints2,x='Intensity',y='Amplitude (uV)',col='Freq',hue=group,kind=kind)
+        if kind == 'line':
+            for ax in fg2.axes.flat:
+                freq = float(ax.get_title().split(' = ')[1])
+                data = wavepoints2[wavepoints2['Freq'] == freq]
+                sns.scatterplot(data=data, x='Intensity', y='Amplitude (uV)', hue=group, style='MouseID', ax=ax, legend=False)
+
+
         self.fig2 = fg2.figure
         self.fig2.tight_layout()
         self.canvas2 = FigureCanvas(self.fig2)
@@ -240,13 +259,38 @@ class resultWindow(QtWidgets.QMainWindow):
         self.layout.addWidget(self.canvas2)
         self.setCentralWidget(self.main_widget)
 
-    def seabornplot(self):
-        # g = sns.FacetGrid(tips, col="sex", hue="time", palette="Set1",
-        #                             hue_order=["Dinner", "Lunch"])
-        # g.map(plt.scatter, "total_bill", "tip", edgecolor="w")
-        g = sns.catplot(data=tips,x='total_bill',y='tip',col="sex", hue="time", palette="Set1",
-                                    hue_order=["Dinner", "Lunch"])
-        return g.figure
+class resultThresholdWindw(QtWidgets.QMainWindow):
+    def __init__(self,thresholds,group=None):
+        super().__init__()
+
+        self.setWindowTitle('ABR Wave Analysis - Results') 
+        self.setGeometry(0,0,1300,1000)
+        # Center the window on the screen
+        screen = QApplication.primaryScreen().geometry()
+        self.move(screen.center().x() - self.width()//2,
+                 screen.center().y() - self.height()//2)
+        self.main_widget = QtWidgets.QWidget(self)
+
+        fg = sns.catplot(data=thresholds,x='Freq',y='Threshold',hue=group,kind='point')
+        self.fig = fg.figure
+        if group is not None:
+            thresholds2 = thresholds.copy()
+            thresholds2['FreqCat'] = thresholds2['Freq'].map({k:i for i,k in enumerate(sorted(thresholds2['Freq'].unique()))})
+            for ax in fg.axes.flat:
+                sns.lineplot(data=thresholds2, x='FreqCat', y='Threshold', hue=group, ax=ax, units='MouseID', estimator=None, alpha=0.2, legend=False)
+                sns.scatterplot(data=thresholds2, x='FreqCat', y='Threshold', hue=group, style='MouseID', s=100, ax=ax, alpha=0.2, legend=False) 
+
+        self.fig.tight_layout()
+        
+        self.canvas = FigureCanvas(self.fig)
+
+        self.canvas.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                       QtWidgets.QSizePolicy.Expanding)
+        self.canvas.updateGeometry()
+
+        self.layout = QtWidgets.QGridLayout(self.main_widget)
+        self.layout.addWidget(self.canvas)
+        self.setCentralWidget(self.main_widget)
 
 class abrWindow(pg.GraphicsView):
     def __init__(self, parent=None, useOpenGL=None, background='default'):
@@ -267,7 +311,6 @@ class abrWindow(pg.GraphicsView):
 
         params = [
         # {'name':'Strain','type':'list','values':['6N','Repaired']},
-            {'name':'Open file','type':'action'},
             {'name':'Reverse polarity','type':'bool','value':False},
             {'name':'Set threshold','type':'action'},
             {'name':'Set no threshold','type':'action'},
@@ -277,38 +320,68 @@ class abrWindow(pg.GraphicsView):
             {'name':'ML Wave 1 (experimental)','type':'action'},
             {'name':'ML threshold (experimental)','type':'action'},
             {'name':'X-axis lim (ms)','type':'float','value':8.0},
-            {'name':'Plot results','type':'action'},                        
-            {'name':'Save ABR traces','type':'action'},                        
-            {'name':'Save results','type':'action'},                        
-
+            {'name':'Plot wave analysis','type':'action'},                        
+            {'name':'Frequencies','type':'str','value':'100,3000,6000,12000,18000,24000,30000,36000,42000'},
+            {'name':'Plot thresholds','type':'action'},
             ]
             
-    
+        paramsFile = [
+            {'name': 'Single file mode', 'type': 'group', 'children': [
+            {'name': 'Open file', 'type': 'action'},
+            {'name': 'Save ABR traces', 'type': 'action'},
+            {'name': 'Save results', 'type': 'action'},
+            ]},
+            {'name': 'Multiple file mode', 'type': 'group', 'children': [
+            {'name': 'Open experiment list', 'type': 'action'},
+            {'name': 'Previous file', 'type': 'action', 'enabled': False},
+            {'name': 'Next file', 'type': 'action', 'enabled': False},
+            {'name': 'Selected File', 'type': 'str', 'value': '0/0'},
+            {'name': 'Export results', 'type': 'action'},
+            ]},
+        ]
 
         ## Create tree of Parameter objects
         self.p = Parameter.create(name='params', type='group', children=params)
         self.t = ParameterTree()
         self.t.setParameters(self.p, showTop=False)
-        self.t.move(int(rect.width()*0.66),int(rect.height()/1.4))
-        self.t.resize(int(rect.width()*0.34/2),int(rect.height()/2.5))
+        self.t.setStyleSheet("QWidget { font-size: 10pt; }")
+
+        self.t.move(int(rect.width()*0.66+rect.width()*0.34/4),int(rect.height()/1.7))
+        self.t.resize(int(rect.width()*0.34/3),int(rect.height()/2.5))
+        #Create tree of parameters for file handling
+        self.pFile = Parameter.create(name='paramsFile', type='group', children=paramsFile)
+        self.tFile = ParameterTree()
+        self.tFile.setParameters(self.pFile, showTop=False)
+        self.tFile.move(int(rect.width()*0.66),int(rect.height()/1.7))
+        self.tFile.resize(int(rect.width()*0.34/4),int(rect.height()/2.5))
+        self.tFile.setStyleSheet("QWidget { font-size: 10pt; }")
+
 
         self.waveAnalysisWidget = myGLW(show=True)
         self.waveAnalysisWidget.move(int(rect.width()*0.66),0)
         self.waveAnalysisWidget.resize(int(rect.width()*0.34),int(rect.height()/2))
 
         self.activeRowCol = (0,0)
-        self.waveAnalysisWidget.t.move(int(rect.width()*0.66+rect.width()*0.34/2),int(rect.height()/1.7))
-        self.waveAnalysisWidget.t.resize(int(rect.width()*0.34/2),int(rect.height()/2.5))
+        self.waveAnalysisWidget.t.move(int(rect.width()*0.66+rect.width()*0.2),int(rect.height()/1.7))
+        self.waveAnalysisWidget.t.resize(int(rect.width()*0.34/2.5),int(rect.height()/2.5))
+        self.waveAnalysisWidget.t.setStyleSheet("QWidget { font-size: 10pt; }")
 
         self.makeConnections()
         self.show()
         self.t.show()
+        self.tFile.show()
 
     def openFileCb(self):
+        self.multipleFilesMode = False
         dlg = pg.widgets.FileDialog.FileDialog()
         #dlg.setFileMode(QFileDialog.AnyFile)
     #    dlg.setFilter("CSV files (*.csv)")
         #filenames = QStringList()
+        #If we open a single file, we disable the next and previous file buttons
+        self.pFile.param('Multiple file mode').param('Next file').setOpts(enabled=False) 
+        self.pFile.param('Multiple file mode').param('Previous file').setOpts(enabled=False)
+        self.pFile.param('Multiple file mode').param('Selected File').setOpts(value = str('0/0'))
+
 
         if dlg.exec_():
             filenames = dlg.selectedFiles()
@@ -316,6 +389,51 @@ class abrWindow(pg.GraphicsView):
         self.folder, self.currentFile = os.path.split(fullpath)
         self.initData()
 
+    def openMultipleFilesCb(self):
+
+        self.multipleFilesMode = True
+        dlg = pg.widgets.FileDialog.FileDialog()
+        if dlg.exec_():
+            filenames = dlg.selectedFiles()
+            print(filenames)
+        self.experimentList = pd.read_csv(filenames[0])
+        self.pFile.param('Multiple file mode').param('Next file').setOpts(enabled=True) 
+        self.pFile.param('Multiple file mode').param('Previous file').setOpts(enabled=True)
+
+        folder = os.path.split(filenames[0])[0]
+        print(folder)
+        
+        self.totalFiles = self.experimentList.shape[0]
+        self.currentFileIndex = 0
+        self.pFile.param('Multiple file mode').param('Selected File').setOpts(value = str(self.currentFileIndex+1)+'/'+str(self.totalFiles))
+        
+        #If the file name is not a full path, we add the folder of the selected file to it.
+        for j,el in self.experimentList.iterrows():
+            if not os.path.isabs(el['Filename']):
+                self.experimentList.loc[j,'Filename'] = os.path.join(folder,os.path.relpath(el['Filename']))
+        
+        print(self.experimentList['Filename'].loc[0])
+
+        self.openFileFromMultiple()
+
+    def openFileFromMultiple(self):
+        self.folder, self.currentFile = os.path.split(self.experimentList['Filename'].loc[self.currentFileIndex])
+        self.initData()
+
+    def nextFileCb(self):
+        self.currentFileIndex+=1
+        if self.currentFileIndex == self.totalFiles:
+            self.currentFileIndex = 0
+        self.pFile.param('Multiple file mode').param('Selected File').setOpts(value = str(self.currentFileIndex+1)+'/'+str(self.totalFiles))
+        self.openFileFromMultiple()
+
+    def prevFileCb(self):
+        self.currentFileIndex-=1
+        if self.currentFileIndex == -1:
+            self.currentFileIndex = self.totalFiles-1
+        self.pFile.param('Multiple file mode').param('Selected File').setOpts(value = str(self.currentFileIndex+1)+'/'+str(self.totalFiles))
+        self.openFileFromMultiple()
+    
     def initData(self):
         try:
             self.abr,self.fs = at.extractABR(os.path.join(self.folder,self.currentFile))
@@ -334,6 +452,7 @@ class abrWindow(pg.GraphicsView):
             files.sort()
             self.abr,self.fs = at.extractABRDS(files,folder=self.folder)
             self.currentFile = prefix
+
         if self.p['Reverse polarity']:
             self.abr = -self.abr
         self.waveAnalysisWidget.fs = self.fs
@@ -389,14 +508,23 @@ class abrWindow(pg.GraphicsView):
             self.wavePoints = pd.DataFrame(columns=['Freq',	'Intensity','P1_x','P1_y','N1_x','N1_y','P2_x','P2_y','N2_x','N2_y','P3_x','P3_y','N3_x','N3_y','P4_x','P4_y','N4_x','N4_y'])
             print('Wave analysis not found')
 
-        try:
-            filename = os.path.splitext(self.currentFile)[0]+'_thresholds.csv'
-            self.threshDict = pd.read_csv(os.path.join(self.folder,filename)).dropna(axis=1).T.squeeze()
-            #Make sure the index is the correct format
-            self.threshDict.index = [str(int(float(el))) for el in self.threshDict.index]
-        except FileNotFoundError:  
-            self.threshDict = pd.Series([0]*len(self.frequencies),index=self.frequencies.astype(int).astype(str))
-            print('Thresholds not found')         
+
+        if self.multipleFilesMode:
+            #in multipleFilesMode, the thresholds are not saved in the file, but in the experiment list
+            thresholds = self.experimentList.loc[self.currentFileIndex,self.frequencies.astype(int).astype(str)]
+            self.threshDict = pd.Series(thresholds,index=self.frequencies.astype(int).astype(str))
+            #replace the NaNs with 0
+            self.threshDict = self.threshDict.fillna(0)
+            
+        else:
+            try:
+                filename = os.path.splitext(self.currentFile)[0]+'_thresholds.csv'
+                self.threshDict = pd.read_csv(os.path.join(self.folder,filename)).dropna(axis=1).T.squeeze()
+                #Make sure the index is the correct format
+                self.threshDict.index = [str(int(float(el))) for el in self.threshDict.index]
+            except FileNotFoundError:  
+                self.threshDict = pd.Series([0]*len(self.frequencies),index=self.frequencies.astype(int).astype(str))
+                print('Thresholds not found')         
 
     def setActivePlot(self,row=0,col=0):
         
@@ -446,19 +574,24 @@ class abrWindow(pg.GraphicsView):
         
     def makeConnections(self):
         #p.keys()['Strain'].sigValueChanged.connect(changeStrainCb)
-        self.p.keys()['Open file'].sigActivated.connect(self.openFileCb)
+        self.pFile.param('Single file mode').param('Open file').sigActivated.connect(self.openFileCb)
         self.p.keys()['Reverse polarity'].sigValueChanged.connect(self.reversePolarityCb)
         self.p.keys()['Set threshold'].sigActivated.connect(self.setThresholdCb)
         self.p.keys()['Set no threshold'].sigActivated.connect(self.setAboveThresholdCb)
-        self.p.keys()['Save results'].sigActivated.connect(self.saveResultsCb)
-        self.p.keys()['Plot results'].sigActivated.connect(self.plotResultsCb)
+        self.p.keys()['Plot wave analysis'].sigActivated.connect(self.plotResultsCb)
+        self.p.keys()['Plot thresholds'].sigActivated.connect(self.plotThresholdsCb)
         self.p.keys()['Guess Wave Peak positions'].sigActivated.connect(lambda: self.guessWavePoints('both'))
         self.p.keys()['Guess Wave Peak higher intensities'].sigActivated.connect(lambda: self.guessWavePoints('higher'))
         self.p.keys()[ 'Guess Wave Peak lower intensities'].sigActivated.connect(lambda: self.guessWavePoints('lower'))
         self.p.keys()['ML Wave 1 (experimental)'].sigActivated.connect(self.MLGuessCB)
         self.p.keys()['ML threshold (experimental)'].sigActivated.connect(self.MLGuessThresholdsCb)
         self.p.keys()['X-axis lim (ms)'].sigValueChanged.connect(self.changeXlimCb)
-        self.p.keys()['Save ABR traces'].sigActivated.connect(self.saveABRTracesCb)
+        self.pFile.param('Single file mode').param('Save ABR traces').sigActivated.connect(self.saveABRTracesCb)
+        self.pFile.param('Single file mode').param('Save results').sigActivated.connect(self.saveResultsCb)
+        self.pFile.param('Multiple file mode').param('Open experiment list').sigActivated.connect(self.openMultipleFilesCb)
+        self.pFile.param('Multiple file mode').param('Next file').sigActivated.connect(self.nextFileCb)
+        self.pFile.param('Multiple file mode').param('Previous file').sigActivated.connect(self.prevFileCb)
+        self.pFile.param('Multiple file mode').param('Export results').sigActivated.connect(self.saveResultsMultipleCb)
 
         self.waveAnalysisWidget.finishSignal.connect(self.retrieveResultsCb)
         self.waveAnalysisWidget.changeTraceSignal.connect(self.navigateTraces)
@@ -509,6 +642,27 @@ class abrWindow(pg.GraphicsView):
         filename2 = os.path.splitext(self.currentFile)[0]+'_thresholds.csv'
         self.threshDict.to_frame().T.to_csv(os.path.join(self.folder,filename2),index=None)
         
+    def saveResultsMultipleCb(self):
+        rows = []
+        for j,el in self.experimentList.iterrows():
+            self.folder, self.currentFile = os.path.split(el['Filename'])
+            wavepoints = pd.read_csv(os.path.join(self.folder,os.path.splitext(self.currentFile)[0]+'_waveAnalysisResults.csv'))
+            wavepoints['Group'] = el['Group']
+            wavepoints['MouseID'] = el['MouseID']
+            rows.append(wavepoints)
+        # Create dialog to select save folder
+        allWavepoints = pd.concat(rows,ignore_index=True)
+
+        avgs = allWavepoints.groupby(['Group','Freq','Intensity'])[['Wave 1 amplitude (uV)','Wave 1 latency (ms)']].agg(['mean','std','count'])
+        dlg = QtWidgets.QFileDialog()
+        dlg.setFileMode(QtWidgets.QFileDialog.Directory)
+
+        if dlg.exec_():
+            saveFolder = dlg.selectedFiles()[0]
+            # Save combined results
+            allWavepoints.to_csv(os.path.join(saveFolder, 'all_waveAnalysisResults.csv'), index=False)
+            avgs.to_csv(os.path.join(saveFolder, 'all_waveAnalysisResults_average.csv'))
+          
 
     def retrieveResultsCb(self):
     
@@ -593,9 +747,51 @@ class abrWindow(pg.GraphicsView):
 
         
     def plotResultsCb(self):
-        self.resultPlot = resultWindow(wavepoints=self.wavePoints)
-        self.resultPlot.show()
-       
+        if not self.multipleFilesMode:
+            frequenciesToPlot = np.array(self.p.keys()['Frequencies'].value().split(',')).astype(int)
+            wavePoints = self.wavePoints.loc[self.wavePoints['Freq'].isin(frequenciesToPlot)]
+            self.resultPlot = resultWindow(wavepoints=wavePoints,kind='scatter')
+            self.resultPlot.show()
+        else:
+            rows = []
+            for j,el in self.experimentList.iterrows():
+                self.folder, self.currentFile = os.path.split(el['Filename'])
+                wavepoints = pd.read_csv(os.path.join(self.folder,os.path.splitext(self.currentFile)[0]+'_waveAnalysisResults.csv'))
+                wavepoints['Group'] = el['Group']
+                wavepoints['MouseID'] = el['MouseID']
+                rows.append(wavepoints)
+
+            allWavepoints = pd.concat(rows,ignore_index=True)
+            frequenciesToPlot = np.array(self.p.keys()['Frequencies'].value().split(',')).astype(int)
+            wavePoints = allWavepoints.loc[allWavepoints['Freq'].isin(frequenciesToPlot)]
+            self.resultPlot = resultWindow(wavepoints=wavePoints,group='Group',kind='line')
+            self.resultPlot.show()
+
+    def plotThresholdsCb(self):
+        if not self.multipleFilesMode:
+            allThresholds = pd.DataFrame({'Freq': self.threshDict.index.astype(int), 
+                                        'Threshold': self.threshDict.values})
+            print(allThresholds)
+            self.thresholdPlot = resultThresholdWindw(allThresholds, group=None)
+            self.thresholdPlot.show()
+        else:
+            rows = []
+            for j,el in self.experimentList.iterrows():
+                #in multipleFilesMode, the thresholds are not saved in the file, but in the experiment list
+                thresholds = self.experimentList.loc[j,self.frequencies.astype(int).astype(str)]
+                threshDict = pd.Series(thresholds,index=self.frequencies.astype(int).astype(str))
+                #replace the NaNs with 0
+                threshDict = threshDict.fillna(0)
+            
+                allThresholds = pd.DataFrame({'Freq': threshDict.index.astype(int), 
+                                                        'Threshold': threshDict.values})
+                allThresholds['Group'] = el['Group']
+                allThresholds['MouseID'] = el['MouseID']
+                rows.append(allThresholds)
+
+            allThresholds = pd.concat(rows,ignore_index=True)
+            self.thresholdPlot = resultThresholdWindw(allThresholds,group='Group')
+            self.thresholdPlot.show()    
 
     def onMouseClicked(self,evt):
         if evt.double():

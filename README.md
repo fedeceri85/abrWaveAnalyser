@@ -1,6 +1,10 @@
 # abrWaveAnalyser
 Marcotti's lab ABR wave analysis GUI. The software can be used to semi-automatically label thresholds and waves (wave I-IV supported) of auditory brainstem responses (ABRs).
 
+## Updates
+### 12/2024
+- Added support for multiple-file analysis. This requires creating a csv file containing the following columns: Date, MouseID, Strain, Genotype, Group, Age, Filename and one column for each frequency, with the same name as the label in the ABR files (e.g., 12000,24000, etc..). The Filename can be either an absolute path, or relaitve to the location of the "master" csv file.
+
 ## Installation
 A python environment with the following libraries is required:
 -   `python 3.10`
@@ -32,3 +36,4 @@ Currently, the software reads data from csv files produced by the ABR systems us
 ## Automatic detection of peaks
 Initial manual labelling of ABR peaks can be used as a starting point to automatically label peaks at higher and lower intensities. Manual adjustment of the automatic detection is sometimes required.  
 A machine-learning model can be used to semi-automatically determine wave 1 position (P1 and N1) and thresholds for all traces. Use of these methods currently requires traces containing exactly 1953 points. 
+
