@@ -37,3 +37,5 @@ Currently, the software reads data from csv files produced by the ABR systems us
 Initial manual labelling of ABR peaks can be used as a starting point to automatically label peaks at higher and lower intensities. Manual adjustment of the automatic detection is sometimes required.  
 A machine-learning model can be used to semi-automatically determine wave 1 position (P1 and N1) and thresholds for all traces. Use of these methods currently requires traces containing exactly 1953 points. 
 
+## Assumptions
+Latency is not calculated for traces which do not have a annotated wave 1, whereas the software assumes that the amplitude is 0 for any sound level not esplicitly annotated, unless the abr trace is not present in the data. 

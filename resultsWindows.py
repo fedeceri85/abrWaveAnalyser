@@ -25,7 +25,10 @@ class resultWindow(QtWidgets.QMainWindow):
         wavepoints2 = wavepoints.copy()
         wavepoints2['Latency (ms)'] = wavepoints2['P1_x']
         wavepoints2['Amplitude (uV)'] = np.abs(wavepoints2['P1_y']-wavepoints2['N1_y'])
-        fg = sns.relplot(data=wavepoints2,x='Intensity',y='Latency (ms)',col='Freq',hue=group,kind=kind,errorbar='sd')
+        if group is not None:
+            fg = sns.relplot(data=wavepoints2,x='Intensity',y='Latency (ms)',col='Freq',hue=group,kind=kind,errorbar='sd')
+        else:
+            fg = sns.relplot(data=wavepoints2,x='Intensity',y='Latency (ms)',col='Freq',kind=kind)
         # Superimpose a scatter plot using seaborn
         if kind == 'line':
             for ax in fg.axes.flat:
@@ -40,7 +43,10 @@ class resultWindow(QtWidgets.QMainWindow):
         
         self.canvas = FigureCanvas(self.fig)
 
-        fg2 = sns.relplot(data=wavepoints2,x='Intensity',y='Amplitude (uV)',col='Freq',hue=group,kind=kind,errorbar='sd')
+        if group is not None:
+            fg2 = sns.relplot(data=wavepoints2,x='Intensity',y='Amplitude (uV)',col='Freq',hue=group,kind=kind,errorbar='sd')
+        else:
+            fg2 = sns.relplot(data=wavepoints2,x='Intensity',y='Amplitude (uV)',col='Freq',kind=kind)
         if kind == 'line':
             for ax in fg2.axes.flat:
                 freq = float(ax.get_title().split(' = ')[1])
@@ -80,8 +86,11 @@ class resultThresholdWindow(QtWidgets.QMainWindow):
         self.move(screen.center().x() - self.width()//2,
                  screen.center().y() - self.height()//2)
         self.main_widget = QtWidgets.QWidget(self)
-
-        fg = sns.catplot(data=thresholds,x='Freq',y='Threshold',hue=group,kind='point',errorbar='sd')
+        if group is not None:
+            fg = sns.catplot(data=thresholds,x='Freq',y='Threshold',hue=group,kind='point',errorbar='sd')
+        else:
+            fg = sns.catplot(data=thresholds,x='Freq',y='Threshold',kind='point',errorbar='sd')
+            
         self.fig = fg.figure
         if group is not None:
             thresholds2 = thresholds.copy()

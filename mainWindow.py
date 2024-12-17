@@ -371,7 +371,7 @@ class abrWindow(pg.GraphicsView):
             freqs.append(el[0])
             intens.append(el[1])
         self.frequencies = np.sort(list(set(freqs)))
-        intensitiesL = np.sort(list(set(intens)))
+        self.intensities = np.sort(list(set(intens)))
         
         self.layout = pg.GraphicsLayout()
         #layout.layout.setContentsMargins(-100,-100,-100,-100)
@@ -385,10 +385,10 @@ class abrWindow(pg.GraphicsView):
             except KeyError:
                 self.outerlayout.addLabel(int(freq),color='k',size='10pt',col=i+1,row=1)
         
-        for i,intens2 in enumerate(intensitiesL[::-1]):
+        for i,intens2 in enumerate( self.intensities[::-1]):
             self.outerlayout.addLabel(str(int(intens2))+' dB',color='k',size='10pt',col=0,row=i+2)
 
-        self.outerlayout.addItem(self.layout,colspan=len(self.frequencies),rowspan=len(intensitiesL),row=2,col=1)
+        self.outerlayout.addItem(self.layout,colspan=len(self.frequencies),rowspan=len( self.intensities),row=2,col=1)
 
         self.setCentralItem(self.outerlayout)
         
@@ -547,7 +547,11 @@ class abrWindow(pg.GraphicsView):
         self.wavePoints.sort_values(['Freq','Intensity'])
         self.wavePoints['Wave 1 amplitude (uV)'] = self.wavePoints['P1_y'] - self.wavePoints['N1_y']
         self.wavePoints['Wave 1 latency (ms)'] = self.wavePoints['P1_x']
-        self.wavePoints.to_csv(os.path.join(self.folder,filename),index=False)
+
+        wavePoints = self.wavePoints.copy()
+        wavePoints = self.addMissingIntensities(wavePoints)
+
+        wavePoints.to_csv(os.path.join(self.folder,filename),index=False)
 
         filename2 = os.path.splitext(self.currentFile)[0]+'_thresholds.csv'
         self.threshDict.to_frame().T.to_csv(os.path.join(self.folder,filename2),index=None)
@@ -564,6 +568,10 @@ class abrWindow(pg.GraphicsView):
         allWavepoints = pd.concat(rows,ignore_index=True)
 
         avgs = allWavepoints.groupby(['Group','Freq','Intensity'])[['Wave 1 amplitude (uV)','Wave 1 latency (ms)']].agg(['mean','std','count'])
+        # Sort the aggregated dataframe by Group, Frequency, and Intensity
+        avgs = avgs.sort_index(level=['Group', 'Freq', 'Intensity'])
+        
+
         dlg = QtWidgets.QFileDialog()
         dlg.setFileMode(QtWidgets.QFileDialog.Directory)
 
@@ -655,11 +663,58 @@ class abrWindow(pg.GraphicsView):
         self.highlightTraceAt(self.activeRowCol[0],self.activeRowCol[1],3)
 
 
+    def addMissingIntensities(self,wavePoints):
+        wavePoints = wavePoints.dropna(subset=['Wave 1 amplitude (uV)'])
+
+        #Add amplitude = 0 for missing intensities below threshold
+        rowsToAppend = []
+        for freq in self.frequencies:
+            threshold = self.threshDict[str(int(freq))]
+            intensities = wavePoints.loc[wavePoints['Freq']==freq,'Intensity']
+            missingIntensities = np.setdiff1d(self.intensities,intensities)
+
+
+            for intens in    missingIntensities:
+                if intens < threshold:
+                    row = pd.Series(index=wavePoints.columns,dtype='object')
+                    row['Freq'] = freq
+                    row['Intensity'] = intens
+                    row['P1_x'] = np.nan
+                    row['P1_y'] = 0
+                    row['N1_x'] = np.nan 
+                    row['N1_y'] = 0
+                    row['Wave 1 amplitude (uV)'] = 0
+                    row['Wave 1 latency (ms)'] = np.nan
+                    rowsToAppend.append(row)
+                else:
+                    #check whether the particular intensity/freq combination is in the abr, if it is than the amplitude is 0, if it is no than we don't add it
+                    if (freq,intens) in self.abr.index:
+                        row = pd.Series(index=wavePoints.columns,dtype='object')
+                        row['Freq'] = freq
+                        row['Intensity'] = intens
+                        row['P1_x'] = np.nan
+                        row['P1_y'] = 0
+                        row['N1_x'] = np.nan 
+                        row['N1_y'] = 0
+                        row['Wave 1 amplitude (uV)'] = 0
+                        row['Wave 1 latency (ms)'] = np.nan
+                        rowsToAppend.append(row)
+
+        try:
+            rowsToAppend = pd.concat(rowsToAppend,axis=1,ignore_index=True).T
+            wavePoints = pd.concat([wavePoints,rowsToAppend],ignore_index=True)
+        except ValueError:
+            pass
         
+        return wavePoints
+    
     def plotResultsCb(self):
         if not self.multipleFilesMode:
             frequenciesToPlot = np.array(self.p.keys()['Frequencies'].value().split(',')).astype(int)
             wavePoints = self.wavePoints.loc[self.wavePoints['Freq'].isin(frequenciesToPlot)]
+            #find the wavepoints with nan as wave 1 amplitude and remove the row from the dataframe
+            wavePoints = self.addMissingIntensities(wavePoints)
+
             self.resultPlot = resultWindow(wavepoints=wavePoints,kind='scatter')
             self.resultPlot.show()
         else:
