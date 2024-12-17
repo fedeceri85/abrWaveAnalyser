@@ -290,6 +290,8 @@ class abrWindow(pg.GraphicsView):
         self.pFile.param('Multiple file mode').param('Previous file').setOpts(enabled=False)
         self.pFile.param('Multiple file mode').param('Selected File').setOpts(value = str('0/0'))
 
+        self.currentFileIndex = 0
+        self.experimentList = None
 
         if dlg.exec_():
             filenames = dlg.selectedFiles()
@@ -720,8 +722,8 @@ class abrWindow(pg.GraphicsView):
         else:
             rows = []
             for j,el in self.experimentList.iterrows():
-                self.folder, self.currentFile = os.path.split(el['Filename'])
-                wavepoints = pd.read_csv(os.path.join(self.folder,os.path.splitext(self.currentFile)[0]+'_waveAnalysisResults.csv'))
+                folder, currentFile = os.path.split(el['Filename'])
+                wavepoints = pd.read_csv(os.path.join(folder,os.path.splitext(currentFile)[0]+'_waveAnalysisResults.csv'))
                 wavepoints['Group'] = el['Group']
                 wavepoints['MouseID'] = el['MouseID']
                 rows.append(wavepoints)
