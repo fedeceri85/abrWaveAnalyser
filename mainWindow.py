@@ -947,21 +947,70 @@ class abrWindow(pg.GraphicsView):
             abr=abr.reset_index()
             rows.append(abr)
         abr_all = pd.concat(rows,ignore_index=True)
-        avg_abr = abr_all.groupby(['Group','level_0','level_1']).mean()
-        std_abr = abr_all.groupby(['Group','level_0','level_1']).std()
-        avg_abr_to_plot = []
-        std_abr_to_plot = []
-        for g in avg_abr.index.get_level_values('Group').unique():
-            avg_abr_to_plot.append(avg_abr.loc[avg_abr.index.get_level_values('Group')==g].droplevel('Group'))
-            std_abr_to_plot.append(std_abr.loc[std_abr.index.get_level_values('Group')==g].droplevel('Group'))
+        avg_abr = abr_all.groupby(['Group','level_0','level_1']).agg(['mean','std','count'])
+        # Reset the index to make the MultiIndex become regular columns
+        df_reset = avg_abr.reset_index()
 
-        self.averageABRwindow = resultAverageTraceWindow(avg_abr_to_plot,std_abr_to_plot,group_labels=avg_abr.index.get_level_values('Group').unique())
-        self.averageABRwindow.show()
-        # if dlg.exec_():
-        #     folder = dlg.selectedFiles()[0]
-        #     # Save to csv
-        #     filename = os.path.join(folder, 'all_average_waveform.csv')
-        #     avg_abr.to_csv(filename)
+        # Melt the DataFrame
+        melted_df = pd.melt(df_reset, 
+                            id_vars=['Group', 'level_0', 'level_1'],
+                            var_name=['time', 'metric'])
+
+        # Pivot to get mean and std in separate columns
+        final_df = melted_df.pivot_table(
+            index=['Group', 'level_0', 'level_1', 'time'],
+            columns='metric',
+            values='value'
+        ).reset_index()
+
+        # Rename the columns
+        final_df.columns.name = None
+        final_df = final_df.rename(columns={
+            'level_0': 'Frequency',
+            'level_1': 'Sound level (dB SPL)',
+            'time':'Time (ms)'
+        })
+        final_df['Time (ms)'] = final_df['Time (ms)'].astype(int)/fs*1000
+        final_df.sort_values(['Group', 'Frequency', 'Sound level (dB SPL)', 'Time (ms)'], inplace=True)
+        final_df
+
+        # Get unique groups
+        groups = final_df['Group'].unique()
+
+        # For each group
+        if dlg.exec_():
+            folder = dlg.selectedFiles()[0]
+            for group in groups:
+                # Create an Excel writer object for this group
+                # Remove any / or \ from group name for valid filename
+                safe_group = group.replace('/', '_').replace('\\', '_')
+                
+                # Create Excel file with sanitized group name
+                with pd.ExcelWriter(os.path.join(folder,f'{safe_group}.xlsx')) as writer:
+
+                    # Get unique frequencies for this group
+                    frequencies = final_df[final_df['Group'] == group]['Frequency'].unique()
+                    
+                    # For each frequency
+                    for freq in frequencies:
+                        # Filter data for this group and frequency
+                        df_sheet = final_df[
+                            (final_df['Group'] == group) & 
+                            (final_df['Frequency'] == freq)
+                        ]
+                        # Swap the order of levels in the columns MultiIndex
+                        pivoted_df = df_sheet.pivot(index=['Group', 'Frequency', 'Time (ms)'], columns='Sound level (dB SPL)', values=['mean', 'std','count'])
+                        pivoted_df.columns = pivoted_df.columns.swaplevel(0, 1)
+                        pivoted_df
+                        # Sort the columns to group mean and std for each sound level together
+                        pivoted_df = pivoted_df.sort_index(axis=1, level=0)
+                        pivoted_df = pivoted_df.reorder_levels([1, 0], axis=1)
+                    #    pivoted_df.columns = ['{}_{}'.format(col[0], col[1]) for col in pivoted_df.columns]
+
+                        
+                        # Save to a sheet named after the frequency
+                        pivoted_df.to_excel(writer, sheet_name=f'{freq}', index=True)
+
 
     def plotAverageABRTracesCb(self,_):
 
