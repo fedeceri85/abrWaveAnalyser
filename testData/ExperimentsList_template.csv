@@ -1,0 +1,6 @@
+﻿Date,MouseID,Strain,Genotype,Group,Age,100,3000,6000,12000,18000,24000,30000,36000,42000,Filename
+20241214,Mouse 1,6N,WT,Ket/Xyl,14,50,85,75,40,35,35,40,60,80,./20241214/Mouse #1.csv
+20241214,Mouse 2,6N,WT,Ket/Xyl,14,50,85,75,45,30,40,40,65,70,./20241214/Mouse #2.csv
+20241214,Mouse 4,6N,WT,Oxygen 0.8 ml/min,14,55,90,80,45,35,45,55,80,90,./20241214/Mouse #4.csv
+20241214,Mouse 5,6N,WT,Oxygen 0.8 ml/min,14,60,90,80,60,50,55,65,85,90,./20241214/Mouse #5.csv
+20241214,Mouse 6,6N,WT,Oxygen 0.8 ml/min,14,50,85,75,50,35,35,40,55,80,./20241214/Mouse #6.csv
