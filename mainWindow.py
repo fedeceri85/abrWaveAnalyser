@@ -17,7 +17,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
 
 import seaborn as sns
-tips = sns.load_dataset("tips")
+from resultsWindows import resultWindow,resultAverageTraceWindow,resultThresholdWindow
 
 # Set white graph
 pg.setConfigOptions(antialias=True)
@@ -196,101 +196,7 @@ def wavePointsToScatter(wavePoints):
     y = wavePoints[ylabels].values[0,:]
     return (x,y)
 
-class resultWindow(QtWidgets.QMainWindow):
-    def __init__(self, wavepoints,group=None,kind='scatter'):
-        '''
-        Kind can be 'scatter' or 'line'
-        '''
 
-        super().__init__()
-
-        self.setWindowTitle('ABR Wave Analysis - Results') 
-        self.setGeometry(0,0,1300,1000)
-        # Center the window on the screen
-        screen = QApplication.primaryScreen().geometry()
-        self.move(screen.center().x() - self.width()//2,
-                 screen.center().y() - self.height()//2)
-        self.main_widget = QtWidgets.QWidget(self)
-
-        wavepoints2 = wavepoints.copy()
-        wavepoints2['Latency (ms)'] = wavepoints2['P1_x']
-        wavepoints2['Amplitude (uV)'] = np.abs(wavepoints2['P1_y']-wavepoints2['N1_y'])
-        fg = sns.relplot(data=wavepoints2,x='Intensity',y='Latency (ms)',col='Freq',hue=group,kind=kind)
-        # Superimpose a scatter plot using seaborn
-        if kind == 'line':
-            for ax in fg.axes.flat:
-                freq = float(ax.get_title().split(' = ')[1])
-                data = wavepoints2[wavepoints2['Freq'] == freq]
-                sns.scatterplot(data=data, x='Intensity', y='Latency (ms)', hue=group, style='MouseID', ax=ax, legend=False)
-
-#                ax.get_legend().remove()
-
-        self.fig = fg.figure
-        self.fig.tight_layout()
-        
-        self.canvas = FigureCanvas(self.fig)
-
-        fg2 = sns.relplot(data=wavepoints2,x='Intensity',y='Amplitude (uV)',col='Freq',hue=group,kind=kind)
-        if kind == 'line':
-            for ax in fg2.axes.flat:
-                freq = float(ax.get_title().split(' = ')[1])
-                data = wavepoints2[wavepoints2['Freq'] == freq]
-                sns.scatterplot(data=data, x='Intensity', y='Amplitude (uV)', hue=group, style='MouseID', ax=ax, legend=False)
-
-
-        self.fig2 = fg2.figure
-        self.fig2.tight_layout()
-        self.canvas2 = FigureCanvas(self.fig2)
-
-        self.canvas.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
-                       QtWidgets.QSizePolicy.Expanding)
-        self.canvas.updateGeometry()
-
-        self.canvas2.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
-                       QtWidgets.QSizePolicy.Expanding)
-        self.canvas2.updateGeometry()
-        # self.button = QtWidgets.QPushButton("Button")
-        # self.label = QtWidgets.QLabel("A plot:")
-
-        self.layout = QtWidgets.QGridLayout(self.main_widget)
-        # self.layout.addWidget(self.button)
-        # self.layout.addWidget(self.label)
-        self.layout.addWidget(self.canvas)
-        self.layout.addWidget(self.canvas2)
-        self.setCentralWidget(self.main_widget)
-
-class resultThresholdWindw(QtWidgets.QMainWindow):
-    def __init__(self,thresholds,group=None):
-        super().__init__()
-
-        self.setWindowTitle('ABR Wave Analysis - Results') 
-        self.setGeometry(0,0,1300,1000)
-        # Center the window on the screen
-        screen = QApplication.primaryScreen().geometry()
-        self.move(screen.center().x() - self.width()//2,
-                 screen.center().y() - self.height()//2)
-        self.main_widget = QtWidgets.QWidget(self)
-
-        fg = sns.catplot(data=thresholds,x='Freq',y='Threshold',hue=group,kind='point')
-        self.fig = fg.figure
-        if group is not None:
-            thresholds2 = thresholds.copy()
-            thresholds2['FreqCat'] = thresholds2['Freq'].map({k:i for i,k in enumerate(sorted(thresholds2['Freq'].unique()))})
-            for ax in fg.axes.flat:
-                sns.lineplot(data=thresholds2, x='FreqCat', y='Threshold', hue=group, ax=ax, units='MouseID', estimator=None, alpha=0.2, legend=False)
-                sns.scatterplot(data=thresholds2, x='FreqCat', y='Threshold', hue=group, style='MouseID', s=100, ax=ax, alpha=0.2, legend=False) 
-
-        self.fig.tight_layout()
-        
-        self.canvas = FigureCanvas(self.fig)
-
-        self.canvas.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
-                       QtWidgets.QSizePolicy.Expanding)
-        self.canvas.updateGeometry()
-
-        self.layout = QtWidgets.QGridLayout(self.main_widget)
-        self.layout.addWidget(self.canvas)
-        self.setCentralWidget(self.main_widget)
 
 class abrWindow(pg.GraphicsView):
     def __init__(self, parent=None, useOpenGL=None, background='default'):
@@ -336,6 +242,8 @@ class abrWindow(pg.GraphicsView):
             {'name': 'Previous file', 'type': 'action', 'enabled': False},
             {'name': 'Next file', 'type': 'action', 'enabled': False},
             {'name': 'Selected File', 'type': 'str', 'value': '0/0'},
+            {'name': 'Plot avg ABR traces', 'type': 'action'},
+            {'name': 'Export avg ABR traces', 'type': 'action'},
             {'name': 'Export results', 'type': 'action'},
             ]},
         ]
@@ -592,6 +500,8 @@ class abrWindow(pg.GraphicsView):
         self.pFile.param('Multiple file mode').param('Next file').sigActivated.connect(self.nextFileCb)
         self.pFile.param('Multiple file mode').param('Previous file').sigActivated.connect(self.prevFileCb)
         self.pFile.param('Multiple file mode').param('Export results').sigActivated.connect(self.saveResultsMultipleCb)
+        self.pFile.param('Multiple file mode').param('Plot avg ABR traces').sigActivated.connect(self.plotAverageABRTracesCb)
+        self.pFile.param('Multiple file mode').param('Export avg ABR traces').sigActivated.connect(self.saveAverageABRTracesCb)
 
         self.waveAnalysisWidget.finishSignal.connect(self.retrieveResultsCb)
         self.waveAnalysisWidget.changeTraceSignal.connect(self.navigateTraces)
@@ -772,7 +682,7 @@ class abrWindow(pg.GraphicsView):
             allThresholds = pd.DataFrame({'Freq': self.threshDict.index.astype(int), 
                                         'Threshold': self.threshDict.values})
             print(allThresholds)
-            self.thresholdPlot = resultThresholdWindw(allThresholds, group=None)
+            self.thresholdPlot = resultThresholdWindow(allThresholds, group=None)
             self.thresholdPlot.show()
         else:
             rows = []
@@ -790,7 +700,7 @@ class abrWindow(pg.GraphicsView):
                 rows.append(allThresholds)
 
             allThresholds = pd.concat(rows,ignore_index=True)
-            self.thresholdPlot = resultThresholdWindw(allThresholds,group='Group')
+            self.thresholdPlot = resultThresholdWindow(allThresholds,group='Group')
             self.thresholdPlot.show()    
 
     def onMouseClicked(self,evt):
@@ -1024,6 +934,55 @@ class abrWindow(pg.GraphicsView):
             # Save to csv
             filename = os.path.join(folder, os.path.splitext(self.currentFile)[0] + 'converted.csv')
             self.abr.to_csv(filename)
+
+
+    def saveAverageABRTracesCb(self,_):
+        dlg = QtWidgets.QFileDialog()
+        dlg.setFileMode(QtWidgets.QFileDialog.Directory)
+        rows = []
+        for j,el in self.experimentList.iterrows():
+            self.folder, self.currentFile = os.path.split(el['Filename'])
+            abr,fs = at.extractABR(os.path.join(self.folder,self.currentFile))
+            abr['Group'] = el['Group']
+            abr=abr.reset_index()
+            rows.append(abr)
+        abr_all = pd.concat(rows,ignore_index=True)
+        avg_abr = abr_all.groupby(['Group','level_0','level_1']).mean()
+        std_abr = abr_all.groupby(['Group','level_0','level_1']).std()
+        avg_abr_to_plot = []
+        std_abr_to_plot = []
+        for g in avg_abr.index.get_level_values('Group').unique():
+            avg_abr_to_plot.append(avg_abr.loc[avg_abr.index.get_level_values('Group')==g].droplevel('Group'))
+            std_abr_to_plot.append(std_abr.loc[std_abr.index.get_level_values('Group')==g].droplevel('Group'))
+
+        self.averageABRwindow = resultAverageTraceWindow(avg_abr_to_plot,std_abr_to_plot,group_labels=avg_abr.index.get_level_values('Group').unique())
+        self.averageABRwindow.show()
+        # if dlg.exec_():
+        #     folder = dlg.selectedFiles()[0]
+        #     # Save to csv
+        #     filename = os.path.join(folder, 'all_average_waveform.csv')
+        #     avg_abr.to_csv(filename)
+
+    def plotAverageABRTracesCb(self,_):
+
+        rows = []
+        for j,el in self.experimentList.iterrows():
+            self.folder, self.currentFile = os.path.split(el['Filename'])
+            abr,fs = at.extractABR(os.path.join(self.folder,self.currentFile))
+            abr['Group'] = el['Group']
+            abr=abr.reset_index()
+            rows.append(abr)
+        abr_all = pd.concat(rows,ignore_index=True)
+        avg_abr = abr_all.groupby(['Group','level_0','level_1']).mean()
+        std_abr = abr_all.groupby(['Group','level_0','level_1']).std()
+        avg_abr_to_plot = []
+        std_abr_to_plot = []
+        for g in avg_abr.index.get_level_values('Group').unique():
+            avg_abr_to_plot.append(avg_abr.loc[avg_abr.index.get_level_values('Group')==g].droplevel('Group'))
+            std_abr_to_plot.append(std_abr.loc[std_abr.index.get_level_values('Group')==g].droplevel('Group'))
+
+        self.averageABRwindow = resultAverageTraceWindow(avg_abr_to_plot,std_abr_to_plot,group_labels=avg_abr.index.get_level_values('Group').unique())
+        self.averageABRwindow.show()
 
     def changeXlimCb(self):
         self.updateCurrentPlotCb()
