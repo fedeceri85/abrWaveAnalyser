@@ -1075,10 +1075,14 @@ class abrWindow(pg.GraphicsView):
         for j,el in self.experimentList.iterrows():
             self.folder, self.currentFile = os.path.split(el['Filename'])
             abr,fs = at.extractABR(os.path.join(self.folder,self.currentFile))
+            xlim = int(self.p['X-axis lim (ms)']*fs/1000)
+            abr = abr.loc[:,0:xlim]
             abr['Group'] = el['Group']
             abr=abr.reset_index()
             rows.append(abr)
+        
         abr_all = pd.concat(rows,ignore_index=True)
+        
         avg_abr = abr_all.groupby(['Group','level_0','level_1']).mean()
         std_abr = abr_all.groupby(['Group','level_0','level_1']).std()
         avg_abr_to_plot = []
