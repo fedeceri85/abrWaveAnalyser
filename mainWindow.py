@@ -1007,11 +1007,19 @@ class abrWindow(pg.GraphicsView):
         avg_abr = abr_all.groupby(['Group','level_0','level_1']).agg(['mean','std','count'])
         # Reset the index to make the MultiIndex become regular columns
         df_reset = avg_abr.reset_index()
+        # Reset index to get rid of second level
 
         # Melt the DataFrame
-        melted_df = pd.melt(df_reset, 
+        try:
+            melted_df = pd.melt(df_reset, 
                             id_vars=['Group', 'level_0', 'level_1'],
                             var_name=['time', 'metric'])
+        except KeyError:
+            melted_df = pd.melt(df_reset, 
+                            id_vars=[('Group',''), ('level_0',''), ('level_1','')],
+                          )
+            melted_df.columns = ['Group', 'level_0', 'level_1', 'time', 'metric', 'value']
+
 
         # Pivot to get mean and std in separate columns
         final_df = melted_df.pivot_table(
