@@ -135,9 +135,10 @@ QTreeView, QTreeWidget {{
 }}
 
 QTreeView::item {{
-    padding: 4px 8px;
-    border-radius: 3px;
-    min-height: 22px;
+    padding: 6px;
+    border-radius: 4px;
+    min-height: 30px; /* Taller rows for modern look */
+    margin: 1px 4px;
 }}
 
 QTreeView::item:hover {{
@@ -149,20 +150,46 @@ QTreeView::item:selected {{
     color: white;
 }}
 
+/* Hide the branch indicators for a cleaner look */
 QTreeView::branch {{
     background-color: transparent;
 }}
 
 QTreeView::branch:has-children:!has-siblings:closed,
 QTreeView::branch:closed:has-children:has-siblings {{
-    border-image: none;
     image: none;
 }}
 
 QTreeView::branch:open:has-children:!has-siblings,
 QTreeView::branch:open:has-children:has-siblings {{
-    border-image: none;
     image: none;
+}}
+
+/* ==================== Embedded Widgets in Tree ==================== */
+/* Make widgets inside the tree blend in seamlessly */
+QTreeView QSpinBox, QTreeView QDoubleSpinBox, QTreeView QComboBox, QTreeView QLineEdit {{
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+}}
+
+QTreeView QSpinBox:hover, QTreeView QDoubleSpinBox:hover, QTreeView QComboBox:hover, QTreeView QLineEdit:hover,
+QTreeView QSpinBox:focus, QTreeView QDoubleSpinBox:focus, QTreeView QComboBox:focus, QTreeView QLineEdit:focus {{
+    background-color: {COLORS['background']};
+    border: 1px solid {COLORS['accent']};
+}}
+
+QTreeView QPushButton {{
+    margin: 2px 4px;
+    padding: 4px 12px;
+    background-color: {COLORS['surface_light']};
+    border: 1px solid {COLORS['border']};
+}}
+
+QTreeView QPushButton:hover {{
+    background-color: {COLORS['accent']};
+    color: white;
+    border: 1px solid {COLORS['accent']};
 }}
 
 /* Header styles for tree/table views */
