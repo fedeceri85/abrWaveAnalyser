@@ -1,7 +1,7 @@
 from PyQt5.Qt import QApplication
 from PyQt5.QtCore import Qt, QSettings
 from PyQt5 import QtGui, QtWidgets
-from PyQt5.QtWidgets import QMainWindow, QDockWidget, QSplitter, QStatusBar, QWidget, QVBoxLayout, QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QMainWindow, QDockWidget, QSplitter, QStatusBar, QWidget, QVBoxLayout, QFileDialog, QMessageBox, QShortcut
 from pyqtgraph.parametertree import Parameter, ParameterTree
 import numpy as np
 import sys
@@ -723,47 +723,45 @@ class abrWindow(QMainWindow):
         self.waveAnalysisWidget.guessBelowSignal.connect(lambda: self.guessWavePoints('lower'))
         self.waveAnalysisWidget.propagatePointSignal.connect(lambda peak: self.guessWavePoints('lower', peaks=[peak]))
         self.waveAnalysisWidget.resetPointBelowSignal.connect(self.resetPointBelowCb)
+        
+        # Initialize keyboard shortcuts
+        self.setupShortcuts()
 
 
 
-    def keyPressEvent(self, ev):
-        if ev.key() == Qt.Key_W:
-            self.navigateTraces('Up')
-        elif ev.key() == Qt.Key_S:
-            self.navigateTraces('Down')
-        elif ev.key() == Qt.Key_A:
-            self.navigateTraces('Left')        
-        elif ev.key() == Qt.Key_D:
-            self.navigateTraces('Right')
-        elif ev.key() == Qt.Key_R:
-            self.guessWavePoints("higher")
-        elif ev.key() == Qt.Key_F:
-            self.guessWavePoints("lower")
-        elif ev.key() == Qt.Key_Z:
-            self.setThresholdCb()
-        # Peak selection shortcuts (also available in wavePeaksWindow)
-        elif ev.key() == Qt.Key_1:
-            self.waveAnalysisWidget.p['Peak type'] = 'P1'
-        elif ev.key() == Qt.Key_2:
-            self.waveAnalysisWidget.p['Peak type'] = 'N1'
-        elif ev.key() == Qt.Key_3:
-            self.waveAnalysisWidget.p['Peak type'] = 'P2'
-        elif ev.key() == Qt.Key_4:
-            self.waveAnalysisWidget.p['Peak type'] = 'N2'
-        elif ev.key() == Qt.Key_5:
-            self.waveAnalysisWidget.p['Peak type'] = 'P3'
-        elif ev.key() == Qt.Key_6:
-            self.waveAnalysisWidget.p['Peak type'] = 'N3'
-        elif ev.key() == Qt.Key_7:
-            self.waveAnalysisWidget.p['Peak type'] = 'P4'
-        elif ev.key() == Qt.Key_8:
-            self.waveAnalysisWidget.p['Peak type'] = 'N4'
-        elif ev.key() == Qt.Key_9:
-            self.waveAnalysisWidget.p['Peak type'] = 'P5'
-        elif ev.key() == Qt.Key_0:
-            self.waveAnalysisWidget.p['Peak type'] = 'N5'
-        elif ev.key() == Qt.Key_E:
-            self.waveAnalysisWidget.nextPeakType()
+    def setupShortcuts(self):
+        """Setup global keyboard shortcuts using QShortcut (works regardless of focus)."""
+        # Navigation
+        QShortcut(QtGui.QKeySequence("W"), self).activated.connect(lambda: self.navigateTraces('Up'))
+        QShortcut(QtGui.QKeySequence("S"), self).activated.connect(lambda: self.navigateTraces('Down'))
+        QShortcut(QtGui.QKeySequence("A"), self).activated.connect(lambda: self.navigateTraces('Left'))
+        QShortcut(QtGui.QKeySequence("D"), self).activated.connect(lambda: self.navigateTraces('Right'))
+        
+        # Actions
+        QShortcut(QtGui.QKeySequence("R"), self).activated.connect(lambda: self.guessWavePoints("higher"))
+        QShortcut(QtGui.QKeySequence("F"), self).activated.connect(lambda: self.guessWavePoints("lower"))
+        QShortcut(QtGui.QKeySequence("Z"), self).activated.connect(self.setThresholdCb)
+        
+        # Peak Selection
+        def setPeak(ptype):
+            self.waveAnalysisWidget.p.param('Peak type').setValue(ptype)
+            
+        QShortcut(QtGui.QKeySequence("1"), self).activated.connect(lambda: setPeak('P1'))
+        QShortcut(QtGui.QKeySequence("2"), self).activated.connect(lambda: setPeak('N1'))
+        QShortcut(QtGui.QKeySequence("3"), self).activated.connect(lambda: setPeak('P2'))
+        QShortcut(QtGui.QKeySequence("4"), self).activated.connect(lambda: setPeak('N2'))
+        QShortcut(QtGui.QKeySequence("5"), self).activated.connect(lambda: setPeak('P3'))
+        QShortcut(QtGui.QKeySequence("6"), self).activated.connect(lambda: setPeak('N3'))
+        QShortcut(QtGui.QKeySequence("7"), self).activated.connect(lambda: setPeak('P4'))
+        QShortcut(QtGui.QKeySequence("8"), self).activated.connect(lambda: setPeak('N4'))
+        QShortcut(QtGui.QKeySequence("9"), self).activated.connect(lambda: setPeak('P5'))
+        QShortcut(QtGui.QKeySequence("0"), self).activated.connect(lambda: setPeak('N5'))
+        QShortcut(QtGui.QKeySequence("E"), self).activated.connect(self.waveAnalysisWidget.nextPeakType)
+        
+        # Finish / Confirm actions
+        QShortcut(QtGui.QKeySequence(Qt.Key_Return), self).activated.connect(self.waveAnalysisWidget.finishSignal.emit)
+        QShortcut(QtGui.QKeySequence(Qt.Key_Enter), self).activated.connect(self.waveAnalysisWidget.finishSignal.emit)
+        QShortcut(QtGui.QKeySequence(Qt.Key_Space), self).activated.connect(self.waveAnalysisWidget.finishSignal.emit)
 
     def navigateTraces(self,a):
         row, col = self.activeRowCol

@@ -33,10 +33,16 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
     propagatePointSignal = QtCore.pyqtSignal(str)
     resetPointBelowSignal = QtCore.pyqtSignal(str)
 
-    def __init__(self, parent=None, show=True, size=None, title=None, **kargs):
-        super().__init__(parent, show, size, title, **kargs)
-        self.setWindowTitle('Current waveform')
-        self.setGeometry(1300,0,600,500)
+    def __init__(self, parent=None, show=True, size=None, title=None, embedded=False, **kargs):
+        # When embedded, we don't want to show as a separate window
+        super().__init__(parent, show=not embedded, size=size, title=title, **kargs)
+        
+        self.embedded = embedded
+        
+        if not embedded:
+            self.setWindowTitle('Current waveform')
+            self.setGeometry(1300,0,600,500)
+        
         self.label = pg.LabelItem(justify='right')
         self.addItem(self.label)
 
@@ -45,8 +51,6 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         self.p1.setAutoVisible(y=True)
         self.initPlot()
         self.vb = self.p1.vb
-
-
 
         self.initParameterWindow()
         self.makeConnections()
@@ -263,8 +267,11 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         self.p = Parameter.create(name='params', type='group', children=params)
         self.t = ParameterTree()
         self.t.setParameters(self.p, showTop=False)
-        self.t.setGeometry(1600,800,300,400)
-        self.t.show()
+        
+        # Only set geometry and show if not embedded (parent will manage layout)
+        if not self.embedded:
+            self.t.setGeometry(1600,800,300,400)
+            self.t.show()
 
     def makeConnections(self):
         self.p1.scene().sigMouseClicked.connect(self.onClick)
@@ -354,47 +361,47 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
                     self.setPoint(self.p['Peak type'],newX,self.data1[index])
             self.finishSignal.emit()
             
-    def keyPressEvent(self, ev):
-        if ev.key() == Qt.Key_W:
-            self.changeTraceSignal.emit('Up')
-        elif ev.key() == Qt.Key_S:
-            self.changeTraceSignal.emit('Down')
-        elif ev.key() == Qt.Key_A:
-            self.changeTraceSignal.emit('Left')        
-        elif ev.key() == Qt.Key_D:
-            self.changeTraceSignal.emit('Right')
-        elif ev.key() == Qt.Key_R:
-            self.guessAboveSignal.emit()
-        
-        elif ev.key() == Qt.Key_F:
-            self.guessBelowSignal.emit()
-        
-        elif ev.key() == Qt.Key_1:
-            self.p['Peak type'] = 'P1'
-        elif ev.key() == Qt.Key_2:
-            self.p['Peak type'] = 'N1'
-        elif ev.key() == Qt.Key_3:
-            self.p['Peak type'] = 'P2'
-        elif ev.key() == Qt.Key_4:
-            self.p['Peak type'] = 'N2'
-        elif ev.key() == Qt.Key_5:
-            self.p['Peak type'] = 'P3'
-        elif ev.key() == Qt.Key_6:
-            self.p['Peak type'] = 'N3'
-        elif ev.key() == Qt.Key_7:
-            self.p['Peak type'] = 'P4'
-        elif ev.key() == Qt.Key_8:
-            self.p['Peak type'] = 'N4'
-        elif ev.key() == Qt.Key_9:
-            self.p['Peak type'] = 'P5'
-        elif ev.key() == Qt.Key_0:
-            self.p['Peak type'] = 'N5'
-        
-        elif  ev.key() == Qt.Key_E:
-            self.nextPeakType()
+    # def keyPressEvent(self, ev):
+    #     if ev.key() == Qt.Key_W:
+    #         self.changeTraceSignal.emit('Up')
+    #     elif ev.key() == Qt.Key_S:
+    #         self.changeTraceSignal.emit('Down')
+    #     elif ev.key() == Qt.Key_A:
+    #         self.changeTraceSignal.emit('Left')        
+    #     elif ev.key() == Qt.Key_D:
+    #         self.changeTraceSignal.emit('Right')
+    #     elif ev.key() == Qt.Key_R:
+    #         self.guessAboveSignal.emit()
+    #     
+    #     elif ev.key() == Qt.Key_F:
+    #         self.guessBelowSignal.emit()
+    #     
+    #     elif ev.key() == Qt.Key_1:
+    #         self.p['Peak type'] = 'P1'
+    #     elif ev.key() == Qt.Key_2:
+    #         self.p['Peak type'] = 'N1'
+    #     elif ev.key() == Qt.Key_3:
+    #         self.p['Peak type'] = 'P2'
+    #     elif ev.key() == Qt.Key_4:
+    #         self.p['Peak type'] = 'N2'
+    #     elif ev.key() == Qt.Key_5:
+    #         self.p['Peak type'] = 'P3'
+    #     elif ev.key() == Qt.Key_6:
+    #         self.p['Peak type'] = 'N3'
+    #     elif ev.key() == Qt.Key_7:
+    #         self.p['Peak type'] = 'P4'
+    #     elif ev.key() == Qt.Key_8:
+    #         self.p['Peak type'] = 'N4'
+    #     elif ev.key() == Qt.Key_9:
+    #         self.p['Peak type'] = 'P5'
+    #     elif ev.key() == Qt.Key_0:
+    #         self.p['Peak type'] = 'N5'
+    #     
+    #     elif  ev.key() == Qt.Key_E:
+    #         self.nextPeakType()
 
-        elif (ev.key() == Qt.Key_Return) or  (ev.key() == Qt.Key_Enter) or  (ev.key() == Qt.Key_Space):
-            self.finishSignal.emit()
+    #     elif (ev.key() == Qt.Key_Return) or  (ev.key() == Qt.Key_Enter) or  (ev.key() == Qt.Key_Space):
+    #         self.finishSignal.emit()
 
     def _getPairedPeak(self, point):
         """Get the paired peak name (P→N or N→P for the same number)."""
