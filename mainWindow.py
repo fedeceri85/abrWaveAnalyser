@@ -533,12 +533,31 @@ class abrWindow(pg.GraphicsView):
             self.guessWavePoints("higher")
         elif ev.key() == Qt.Key_F:
             self.guessWavePoints("lower")
-        # elif ev.key() == Qt.Key_Z:
-        #     self.prevMouseCb()
-        # elif ev.key() == Qt.Key_X:
-        #     self.nextMouseCb()
         elif ev.key() == Qt.Key_Z:
             self.setThresholdCb()
+        # Peak selection shortcuts (also available in wavePeaksWindow)
+        elif ev.key() == Qt.Key_1:
+            self.waveAnalysisWidget.p['Peak type'] = 'P1'
+        elif ev.key() == Qt.Key_2:
+            self.waveAnalysisWidget.p['Peak type'] = 'N1'
+        elif ev.key() == Qt.Key_3:
+            self.waveAnalysisWidget.p['Peak type'] = 'P2'
+        elif ev.key() == Qt.Key_4:
+            self.waveAnalysisWidget.p['Peak type'] = 'N2'
+        elif ev.key() == Qt.Key_5:
+            self.waveAnalysisWidget.p['Peak type'] = 'P3'
+        elif ev.key() == Qt.Key_6:
+            self.waveAnalysisWidget.p['Peak type'] = 'N3'
+        elif ev.key() == Qt.Key_7:
+            self.waveAnalysisWidget.p['Peak type'] = 'P4'
+        elif ev.key() == Qt.Key_8:
+            self.waveAnalysisWidget.p['Peak type'] = 'N4'
+        elif ev.key() == Qt.Key_9:
+            self.waveAnalysisWidget.p['Peak type'] = 'P5'
+        elif ev.key() == Qt.Key_0:
+            self.waveAnalysisWidget.p['Peak type'] = 'N5'
+        elif ev.key() == Qt.Key_E:
+            self.waveAnalysisWidget.nextPeakType()
 
     def navigateTraces(self,a):
         row, col = self.activeRowCol
