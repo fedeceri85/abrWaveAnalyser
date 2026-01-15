@@ -473,10 +473,10 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
                 if wavePoints[point+'_x'].isna().values[0]==False:
                     self.setPoint(point,wavePoints[point+'_x'].values[0],wavePoints[point+'_y'].values[0]) 
                 else:
-                    self.resetPoint(point,emitSignal=False)
+                    self._resetSinglePoint(point)
         else:
             for point in self.pointDict.keys():
-                self.resetPoint(point,emitSignal=False)
+                self._resetSinglePoint(point)
 
         self.linePlot.setData(self.times,self.data1)
         self.p1.setXRange(0,8)
