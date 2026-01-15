@@ -396,11 +396,27 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         elif (ev.key() == Qt.Key_Return) or  (ev.key() == Qt.Key_Enter) or  (ev.key() == Qt.Key_Space):
             self.finishSignal.emit()
 
-    def resetPoint(self,point,emitSignal = True):
+    def _getPairedPeak(self, point):
+        """Get the paired peak name (P→N or N→P for the same number)."""
+        if point.startswith('P'):
+            return 'N' + point[1:]
+        else:
+            return 'P' + point[1:]
+
+    def _resetSinglePoint(self, point):
+        """Reset a single point without resetting its pair."""
         self.p.keys()[point].keys()['x'].setValue(0)  
         self.p.keys()[point].keys()['y'].setValue(0)
         self.labelDict[point].setPos(np.nan,np.nan)
         self.pointDict[point].setData([0],[0])
+
+    def resetPoint(self, point, emitSignal=True):
+        """Reset a point and its paired peak (P3 resets N3 and vice versa)."""
+        # Reset the requested point
+        self._resetSinglePoint(point)
+        # Also reset the paired peak
+        pairedPeak = self._getPairedPeak(point)
+        self._resetSinglePoint(pairedPeak)
 
         if emitSignal:
             self.finishSignal.emit()

@@ -927,23 +927,31 @@ class abrWindow(pg.GraphicsView):
         self.updateCurrentPlotCb()
 
     def resetPointBelowCb(self, peakName):
-        """Reset a specific peak for the current intensity and all lower intensities.
+        """Reset a specific peak and its pair for the current intensity and all lower intensities.
         
         Args:
-            peakName: The peak to reset, e.g., 'P1', 'N1', etc.
+            peakName: The peak to reset, e.g., 'P1', 'N1', etc. Also resets the paired peak.
         """
+        # Get the paired peak name (P3→N3, N3→P3)
+        if peakName.startswith('P'):
+            pairedPeak = 'N' + peakName[1:]
+        else:
+            pairedPeak = 'P' + peakName[1:]
+        
         freq, initialIntens = self.plotToFreqIntMap[self.activeRowCol]
         threshold = self.threshDict[str(int(freq))]
         
-        # Reset the peak for all intensities from threshold up to (and including) current intensity
+        # Reset both peaks for all intensities from threshold up to (and including) current intensity
         for intens in self.intensities:
             if intens >= threshold and intens <= initialIntens:
                 # Check if entry exists
                 mask = (self.wavePoints['Freq'] == freq) & (self.wavePoints['Intensity'] == intens)
                 if mask.any():
-                    # Set the specific peak to NaN
+                    # Set both peaks to NaN
                     self.wavePoints.loc[mask, peakName + '_x'] = np.nan
                     self.wavePoints.loc[mask, peakName + '_y'] = np.nan
+                    self.wavePoints.loc[mask, pairedPeak + '_x'] = np.nan
+                    self.wavePoints.loc[mask, pairedPeak + '_y'] = np.nan
         
         self.updateCurrentPlotCb()
         self.setActivePlot(self.activeRowCol[0], self.activeRowCol[1])
