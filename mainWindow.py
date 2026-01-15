@@ -1,6 +1,7 @@
 from PyQt5.Qt import QApplication
-from PyQt5.QtCore import Qt
-from PyQt5 import QtGui,QtWidgets
+from PyQt5.QtCore import Qt, QSettings
+from PyQt5 import QtGui, QtWidgets
+from PyQt5.QtWidgets import QMainWindow, QDockWidget, QSplitter, QStatusBar, QWidget, QVBoxLayout, QFileDialog
 from pyqtgraph.parametertree import Parameter, ParameterTree
 import numpy as np
 import sys
@@ -8,7 +9,7 @@ sys.path.append('../')
 import abrTools as at
 import os
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore,QtWidgets
+from pyqtgraph.Qt import QtCore, QtWidgets as pgQtWidgets
 from wavePeaksWindow import myGLW, findNearestPeak
 import pandas as pd
 import itertools
@@ -17,9 +18,13 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
 
 import seaborn as sns
-from resultsWindows import resultWindow,resultAverageTraceWindow,resultThresholdWindow
+from resultsWindows import resultWindow, resultAverageTraceWindow, resultThresholdWindow
 
-# Set white graph
+# Import the modern stylesheet
+from styles import apply_dark_theme, get_plot_colors, DARK_STYLESHEET
+from helpWindow import HelpDialog
+
+# Set white graph (keep plots readable)
 pg.setConfigOptions(antialias=True)
 pg.setConfigOption('background', 'w')
 pg.setConfigOption('foreground', 'k')
@@ -30,6 +35,22 @@ if not _instance:
     _instance = QApplication([])
 app = _instance
 
+# Apply the dark theme
+apply_dark_theme(app)
+
+# Settings helper - stores settings in local .settings folder for portability
+def getSettings():
+    """Get QSettings using a local .settings folder (works same on all platforms)."""
+    # Get the directory where this script is located
+    appDir = os.path.dirname(os.path.abspath(__file__))
+    settingsDir = os.path.join(appDir, '.settings')
+    
+    # Create the settings directory if it doesn't exist
+    if not os.path.exists(settingsDir):
+        os.makedirs(settingsDir)
+    
+    settingsFile = os.path.join(settingsDir, 'settings.ini')
+    return QSettings(settingsFile, QSettings.IniFormat)
 
 
 # frequencies = ['Click', '3 kHz', '6 kHz', '12 kHz', '18 kHz', '24 kHz',
@@ -198,93 +219,205 @@ def wavePointsToScatter(wavePoints):
 
 
 
-class abrWindow(pg.GraphicsView):
-    def __init__(self, parent=None, useOpenGL=None, background='default'):
-        super().__init__(parent, useOpenGL, background)
+class abrWindow(QMainWindow):
+    def __init__(self, parent=None):
+        super().__init__(parent)
 
         self.setWindowTitle('ABR Wave Analysis - Sheffield Hearing research group') 
-        self.setGeometry(0,0,1300,1000)
-        self.move(0,0)
-
-
+        
+        # Get screen dimensions
         screen = QApplication.primaryScreen()
         print('Screen: %s' % screen.name())
         size = screen.size()
         print('Size: %d x %d' % (size.width(), size.height()))
         rect = screen.availableGeometry()
         print('Available: %d x %d' % (rect.width(), rect.height()))
-        self.resize(int(rect.width()*0.66),rect.height())
-
-        params = [
-        # {'name':'Strain','type':'list','values':['6N','Repaired']},
-            {'name':'Reverse polarity','type':'bool','value':False},
-            {'name':'Set threshold','type':'action'},
-            {'name':'Set no threshold','type':'action'},
-            {'name':'Guess Wave Peak positions','type':'action'},
-            {'name':'Guess Wave Peak higher intensities','type':'action'},
-            {'name':'Guess Wave Peak lower intensities','type':'action'},
-            {'name':'ML Wave 1 (experimental)','type':'action'},
-            {'name':'ML threshold (experimental)','type':'action'},
-            {'name':'X-axis lim (ms)','type':'float','value':8.0},
-            {'name':'Plot wave analysis','type':'action'},                        
-            {'name':'Frequencies','type':'str','value':'100,3000,6000,12000,18000,24000,30000,36000,42000'},
-            {'name':'Plot thresholds','type':'action'},
-            ]
-            
+        
+        # Set window size to fill most of the screen
+        self.setGeometry(50, 50, int(rect.width() * 0.9), int(rect.height() * 0.9))
+        
+        # ==================== Create Central Widget ====================
+        # Main traces view takes the full central area
+        self.tracesView = pg.GraphicsLayoutWidget()
+        self.tracesView.setBackground('w')
+        self.setCentralWidget(self.tracesView)
+        
+        # ==================== Create Dock Widgets ====================
+        
+        # Waveform dock (top right) - Current trace detail view
+        self.waveAnalysisWidget = myGLW(parent=self, show=False, embedded=True)
+        self.waveformDock = QDockWidget("Current Waveform", self)
+        self.waveformDock.setWidget(self.waveAnalysisWidget)
+        self.waveformDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.waveformDock)
+        
+        # File operations dock
         paramsFile = [
             {'name': 'Single file mode', 'type': 'group', 'children': [
-            {'name': 'Open file', 'type': 'action'},
-            {'name': 'Save ABR traces', 'type': 'action'},
-            {'name': 'Save results', 'type': 'action'},
+                {'name': 'Open file', 'type': 'action'},
+                {'name': 'Save ABR traces', 'type': 'action'},
+                {'name': 'Save results', 'type': 'action'},
             ]},
             {'name': 'Multiple file mode', 'type': 'group', 'children': [
-            {'name': 'Open experiment list', 'type': 'action'},
-            {'name': 'Previous file', 'type': 'action', 'enabled': False},
-            {'name': 'Next file', 'type': 'action', 'enabled': False},
-            {'name': 'Selected File', 'type': 'str', 'value': '0/0'},
-            {'name': 'Plot avg ABR traces', 'type': 'action'},
-            {'name': 'Export avg ABR traces', 'type': 'action'},
-            {'name': 'Export results', 'type': 'action'},
+                {'name': 'Open experiment list', 'type': 'action'},
+                {'name': 'Previous file', 'type': 'action', 'enabled': False},
+                {'name': 'Next file', 'type': 'action', 'enabled': False},
+                {'name': 'Selected File', 'type': 'str', 'value': '0/0'},
+                {'name': 'Plot avg ABR traces', 'type': 'action'},
+                {'name': 'Export avg ABR traces', 'type': 'action'},
+                {'name': 'Export results', 'type': 'action'},
             ]},
         ]
-
-        ## Create tree of Parameter objects
-        self.p = Parameter.create(name='params', type='group', children=params)
-        self.t = ParameterTree()
-        self.t.setParameters(self.p, showTop=False)
-        self.t.setStyleSheet("QWidget { font-size: 10pt; }")
-
-        self.t.move(int(rect.width()*0.66+rect.width()*0.34/4),int(rect.height()/1.7))
-        self.t.resize(int(rect.width()*0.34/3),int(rect.height()/2.5))
-        #Create tree of parameters for file handling
+        
         self.pFile = Parameter.create(name='paramsFile', type='group', children=paramsFile)
         self.tFile = ParameterTree()
         self.tFile.setParameters(self.pFile, showTop=False)
-        self.tFile.move(int(rect.width()*0.66),int(rect.height()/1.7))
-        self.tFile.resize(int(rect.width()*0.34/4),int(rect.height()/2.5))
-        self.tFile.setStyleSheet("QWidget { font-size: 10pt; }")
-
-
-        self.waveAnalysisWidget = myGLW(show=True)
-        self.waveAnalysisWidget.move(int(rect.width()*0.66),0)
-        self.waveAnalysisWidget.resize(int(rect.width()*0.34),int(rect.height()/2))
-
-        self.activeRowCol = (0,0)
-        self.waveAnalysisWidget.t.move(int(rect.width()*0.66+rect.width()*0.2),int(rect.height()/1.7))
-        self.waveAnalysisWidget.t.resize(int(rect.width()*0.34/2.5),int(rect.height()/2.5))
-        self.waveAnalysisWidget.t.setStyleSheet("QWidget { font-size: 10pt; }")
-
+        
+        self.fileDock = QDockWidget("File Operations", self)
+        self.fileDock.setWidget(self.tFile)
+        self.fileDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.fileDock)
+        
+        # Analysis controls dock
+        params = [
+            {'name': 'Reverse polarity', 'type': 'bool', 'value': False},
+            {'name': 'Set threshold', 'type': 'action'},
+            {'name': 'Set no threshold', 'type': 'action'},
+            {'name': 'Guess Wave Peak positions', 'type': 'action'},
+            {'name': 'Guess Wave Peak higher intensities', 'type': 'action'},
+            {'name': 'Guess Wave Peak lower intensities', 'type': 'action'},
+            {'name': 'ML Wave 1 (experimental)', 'type': 'action'},
+            {'name': 'ML threshold (experimental)', 'type': 'action'},
+            {'name': 'X-axis lim (ms)', 'type': 'float', 'value': 8.0},
+            {'name': 'Plot wave analysis', 'type': 'action'},                        
+            {'name': 'Frequencies', 'type': 'str', 'value': '100,3000,6000,12000,18000,24000,30000,36000,42000'},
+            {'name': 'Plot thresholds', 'type': 'action'},
+        ]
+        
+        self.p = Parameter.create(name='params', type='group', children=params)
+        self.t = ParameterTree()
+        self.t.setParameters(self.p, showTop=False)
+        
+        self.analysisDock = QDockWidget("Analysis Controls", self)
+        self.analysisDock.setWidget(self.t)
+        self.analysisDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.analysisDock)
+        
+        # Peak controls dock (from waveAnalysisWidget)
+        self.peaksDock = QDockWidget("Peak Controls", self)
+        self.peaksDock.setWidget(self.waveAnalysisWidget.t)
+        self.peaksDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.peaksDock)
+        
+        # Arrange docks: Waveform on TOP, then tabbed controls BELOW
+        
+        # 1. Split waveform above the file dock first (establishes the vertical split)
+        self.splitDockWidget(self.waveformDock, self.fileDock, Qt.Vertical)
+        
+        # 2. Now stack the other control docks onto the file dock
+        self.tabifyDockWidget(self.fileDock, self.analysisDock)
+        self.tabifyDockWidget(self.fileDock, self.peaksDock)
+        
+        # 3. Ensure file dock is the visible tab
+        self.fileDock.raise_()
+        
+        # Set dock sizes: waveform gets more height for visibility
+        self.resizeDocks([self.waveformDock], [350], Qt.Vertical)
+        self.resizeDocks([self.fileDock], [300], Qt.Vertical)
+        
+        # Set dock width (narrower right panel, ~320px)
+        self.resizeDocks([self.waveformDock], [320], Qt.Horizontal)
+        
+        # ==================== Create Menu Bar ====================
+        self.createMenuBar()
+        
+        # ==================== Create Status Bar ====================
+        self.statusBar = QStatusBar()
+        self.setStatusBar(self.statusBar)
+        self.statusBar.showMessage("Ready - Open a file to begin")
+        
+        # ==================== Initialize State ====================
+        self.activeRowCol = (0, 0)
+        self.layout = None  # Will be set when data is loaded
+        self.outerlayout = None
+        
+        # Restore window geometry and dock state from settings
+        self._restoreWindowState()
+        
         self.makeConnections()
         self.show()
-        self.t.show()
-        self.tFile.show()
+    
+    def createMenuBar(self):
+        """Create the application menu bar."""
+        menubar = self.menuBar()
+        
+        # Help Menu
+        helpMenu = menubar.addMenu('&Help')
+        
+        # User Guide Action
+        userGuideAction = QtWidgets.QAction('&User Guide', self)
+        userGuideAction.setShortcut('F1')
+        userGuideAction.setStatusTip('Show the application user guide')
+        userGuideAction.triggered.connect(self.showHelp)
+        helpMenu.addAction(userGuideAction)
+        
+        # About Action (optional, reuses User Guide for now or could be separate)
+        # aboutAction = QtWidgets.QAction('&About', self)
+        # helpMenu.addAction(aboutAction)
+
+    def showHelp(self):
+        """Show the User Guide dialog."""
+        dlg = HelpDialog(self)
+        dlg.exec_()
+
+    def _restoreWindowState(self):
+        """Restore window geometry and custom dock sizes."""
+        settings = getSettings()
+        
+        # 1. Restore window geometry (position and size)
+        geometry = settings.value('windowGeometry')
+        if geometry:
+            self.restoreGeometry(geometry)
+            
+        # 2. Restore dock sizes (width and vertical split) if saved
+        try:
+            # Note: Values stored as strings in INI, need conversion
+            dockWidth = int(settings.value('dockWidth', 320))
+            waveHeight = int(settings.value('waveHeight', 350))
+            controlHeight = int(settings.value('controlHeight', 300))
+            
+            # Apply width (horizontal resize)
+            self.resizeDocks([self.waveformDock], [dockWidth], Qt.Horizontal)
+            
+            # Apply vertical split (vertical resize)
+            self.resizeDocks([self.waveformDock, self.fileDock], [waveHeight, controlHeight], Qt.Vertical)
+        except (ValueError, TypeError):
+            pass # Fallback to defaults defined in __init__
+    
+    def closeEvent(self, event):
+        """Save window geometry and dock sizes."""
+        settings = getSettings()
+        
+        # Save window geometry
+        settings.setValue('windowGeometry', self.saveGeometry())
+        
+        # Save dock dimensions so we can restore the split proportions
+        settings.setValue('dockWidth', self.waveformDock.width())
+        settings.setValue('waveHeight', self.waveformDock.height())
+        settings.setValue('controlHeight', self.fileDock.height())
+        
+        event.accept()
 
     def openFileCb(self):
         self.multipleFilesMode = False
-        dlg = pg.widgets.FileDialog.FileDialog()
-        #dlg.setFileMode(QFileDialog.AnyFile)
-    #    dlg.setFilter("CSV files (*.csv)")
-        #filenames = QStringList()
+        
+        # Get last used folder from settings
+        settings = getSettings()
+        lastFolder = settings.value('lastFolder', os.path.expanduser('~'))
+        
+        dlg = QFileDialog(self, 'Open ABR File', lastFolder)
+        dlg.setFileMode(QFileDialog.ExistingFile)
+        
         #If we open a single file, we disable the next and previous file buttons
         self.pFile.param('Multiple file mode').param('Next file').setOpts(enabled=False) 
         self.pFile.param('Multiple file mode').param('Previous file').setOpts(enabled=False)
@@ -295,36 +428,49 @@ class abrWindow(pg.GraphicsView):
 
         if dlg.exec_():
             filenames = dlg.selectedFiles()
-        fullpath = filenames[0]
-        self.folder, self.currentFile = os.path.split(fullpath)
-        self.initData()
+            fullpath = filenames[0]
+            self.folder, self.currentFile = os.path.split(fullpath)
+            
+            # Save the folder for next time
+            settings.setValue('lastFolder', self.folder)
+            
+            self.initData()
 
     def openMultipleFilesCb(self):
-
         self.multipleFilesMode = True
-        dlg = pg.widgets.FileDialog.FileDialog()
+        
+        # Get last used folder from settings
+        settings = getSettings()
+        lastFolder = settings.value('lastFolder', os.path.expanduser('~'))
+        
+        dlg = QFileDialog(self, 'Open Experiment List', lastFolder, 'CSV Files (*.csv)')
+        dlg.setFileMode(QFileDialog.ExistingFile)
+        
         if dlg.exec_():
             filenames = dlg.selectedFiles()
             print(filenames)
-        self.experimentList = pd.read_csv(filenames[0])
-        self.pFile.param('Multiple file mode').param('Next file').setOpts(enabled=True) 
-        self.pFile.param('Multiple file mode').param('Previous file').setOpts(enabled=True)
+            self.experimentList = pd.read_csv(filenames[0])
+            self.pFile.param('Multiple file mode').param('Next file').setOpts(enabled=True) 
+            self.pFile.param('Multiple file mode').param('Previous file').setOpts(enabled=True)
 
-        folder = os.path.split(filenames[0])[0]
-        print(folder)
-        
-        self.totalFiles = self.experimentList.shape[0]
-        self.currentFileIndex = 0
-        self.pFile.param('Multiple file mode').param('Selected File').setOpts(value = str(self.currentFileIndex+1)+'/'+str(self.totalFiles))
-        
-        #If the file name is not a full path, we add the folder of the selected file to it.
-        for j,el in self.experimentList.iterrows():
-            if not os.path.isabs(el['Filename']):
-                self.experimentList.loc[j,'Filename'] = os.path.join(folder,os.path.relpath(el['Filename']))
-        
-        print(self.experimentList['Filename'].loc[0])
+            folder = os.path.split(filenames[0])[0]
+            print(folder)
+            
+            # Save the folder for next time
+            settings.setValue('lastFolder', folder)
+            
+            self.totalFiles = self.experimentList.shape[0]
+            self.currentFileIndex = 0
+            self.pFile.param('Multiple file mode').param('Selected File').setOpts(value = str(self.currentFileIndex+1)+'/'+str(self.totalFiles))
+            
+            #If the file name is not a full path, we add the folder of the selected file to it.
+            for j,el in self.experimentList.iterrows():
+                if not os.path.isabs(el['Filename']):
+                    self.experimentList.loc[j,'Filename'] = os.path.join(folder,os.path.relpath(el['Filename']))
+            
+            print(self.experimentList['Filename'].loc[0])
 
-        self.openFileFromMultiple()
+            self.openFileFromMultiple()
 
     def openFileFromMultiple(self):
         self.folder, self.currentFile = os.path.split(self.experimentList['Filename'].loc[self.currentFileIndex])
@@ -376,7 +522,6 @@ class abrWindow(pg.GraphicsView):
         self.intensities = np.sort(list(set(intens)))
         
         self.layout = pg.GraphicsLayout()
-        #layout.layout.setContentsMargins(-100,-100,-100,-100)
         self.outerlayout = pg.GraphicsLayout()
 
         self.titleLabel = self.outerlayout.addLabel('Title',color='k',size='16pt',bold=True,row=0,col=0,colspan=10)
@@ -392,15 +537,15 @@ class abrWindow(pg.GraphicsView):
 
         self.outerlayout.addItem(self.layout,colspan=len(self.frequencies),rowspan=len( self.intensities),row=2,col=1)
 
-        self.setCentralItem(self.outerlayout)
+        # Use tracesView instead of self for setting central item
+        self.tracesView.setCentralItem(self.outerlayout)
         
-        self.sc = self.scene()
+        # Connect mouse click to the layout's scene
         self.sc2 = self.layout.scene()
         self.sc2.sigMouseClicked.connect(self.onMouseClicked)
         
-
-       # self.wavePoints = pd.DataFrame(columns=['Freq',	'Intensity','P1_x','P1_y','N1_x','N1_y','P2_x','P2_y','N2_x','N2_y','P3_x','P3_y','N3_x','N3_y','P4_x','P4_y','N4_x','N4_y'])
-
+        # Update status bar
+        self.statusBar.showMessage(f"Loaded: {self.currentFile} | {len(self.frequencies)} frequencies, {len(self.intensities)} intensities")
 
         self.plotDict,self.wavePointsPlotDict, self.plotToFreqIntMap = makeFigureqt(freqs,intens,self.abr.values,self.layout,'',fs=self.fs,wavePoints=None,xlim=self.p['X-axis lim (ms)'])
         
@@ -464,6 +609,11 @@ class abrWindow(pg.GraphicsView):
 
         freq,intens = self.plotToFreqIntMap[(row,col)]
         print('Selected trace Freq: '+str(freq)+'   Intensity: '+str(intens))
+        
+        # Update status bar with selected trace info
+        freq_display = frequenciesDict.get(int(freq), f"{int(freq)} Hz")
+        self.statusBar.showMessage(f"{self.currentFile} | Selected: {freq_display} @ {int(intens)} dB")
+        
         if self.wavePoints is not None:
             selectedWavePoints = self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==intens) ]
             
@@ -796,7 +946,7 @@ class abrWindow(pg.GraphicsView):
         if evt.double():
             pass#
             '''
-            items = self.sc.items(evt.scenePos())
+            items = self.sc2.items(evt.scenePos())
             for item in items:
                 if isinstance(item,pg.PlotItem):
                     plItem = self.plotDict [item.objectName()]
@@ -812,7 +962,7 @@ class abrWindow(pg.GraphicsView):
                         plItem.setPen('k')
             '''
         else:
-            items = self.sc.items(evt.scenePos())
+            items = self.sc2.items(evt.scenePos())
             for item in items:
                 if isinstance(item,pg.PlotItem):
                     #msg =  str(self.activeRowCol[0])+' '+str(self.activeRowCol[1])
