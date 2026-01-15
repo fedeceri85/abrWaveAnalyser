@@ -509,6 +509,7 @@ class abrWindow(pg.GraphicsView):
         self.waveAnalysisWidget.changeTraceSignal.connect(self.navigateTraces)
         self.waveAnalysisWidget.guessAboveSignal.connect(lambda: self.guessWavePoints('higher'))
         self.waveAnalysisWidget.guessBelowSignal.connect(lambda: self.guessWavePoints('lower'))
+        self.waveAnalysisWidget.propagatePointSignal.connect(lambda peak: self.guessWavePoints('lower', peaks=[peak]))
 
 
 
@@ -789,13 +790,18 @@ class abrWindow(pg.GraphicsView):
               
             
                     row, col = [int(ee) for ee in item.objectName().split(' ')]
-
-                    self.setActivePlot(row,col)
+            self.setActivePlot(row,col)
 
 
     
-    def guessWavePoints(self, direction = 'both'):
+    def guessWavePoints(self, direction = 'both', peaks=None):
+        """Propagate wave points to other traces.
         
+        Args:
+            direction: 'both', 'higher', or 'lower' - which intensities to propagate to
+            peaks: Optional list of peak names (e.g., ['P1']) to propagate. 
+                   If None, propagates all peaks (P1-P4, N1-N4).
+        """
         freq,initialIntens = self.plotToFreqIntMap[self.activeRowCol]
         threshold = self.threshDict[str(int(freq))]
         
@@ -809,6 +815,11 @@ class abrWindow(pg.GraphicsView):
             lowerLimit = threshold
             higherLimit = initialIntens
 
+        # Determine which peaks to process
+        if peaks is None:
+            peaksToProcess = ['P1', 'N1', 'P2', 'N2', 'P3', 'N3', 'P4', 'N4']
+        else:
+            peaksToProcess = peaks
 
         activeRow = self.activeRowCol[0]
         activeCol = self.activeRowCol[1]
@@ -826,19 +837,23 @@ class abrWindow(pg.GraphicsView):
                         print((freq,intens))
                         points = {}
                         for peak in [1,2,3,4]:
-                            try:
-                                initialGuess_x = int(initialWavePoints['P'+str(peak)+'_x'].values[0]*self.fs/1000)
-                                guess_x = findNearestPeak(trace, initialGuess_x)    
-                                points['P'+str(peak)] = (guess_x/self.fs*1000,trace[guess_x])
-                            except ValueError:
-                                points['P'+str(peak)] = (np.nan,np.nan)
+                            # Only process P peaks that are in peaksToProcess
+                            if 'P'+str(peak) in peaksToProcess:
+                                try:
+                                    initialGuess_x = int(initialWavePoints['P'+str(peak)+'_x'].values[0]*self.fs/1000)
+                                    guess_x = findNearestPeak(trace, initialGuess_x)    
+                                    points['P'+str(peak)] = (guess_x/self.fs*1000,trace[guess_x])
+                                except ValueError:
+                                    points['P'+str(peak)] = (np.nan,np.nan)
 
-                            try:
-                                initialGuess_x = int(initialWavePoints['N'+str(peak)+'_x'].values[0]*self.fs/1000)
-                                guess_x = findNearestPeak(trace, initialGuess_x, negative=True  )
-                                points['N'+str(peak)] = (guess_x/self.fs*1000,trace[guess_x])
-                            except ValueError:
-                                points['N'+str(peak)] = (np.nan,np.nan)
+                            # Only process N peaks that are in peaksToProcess
+                            if 'N'+str(peak) in peaksToProcess:
+                                try:
+                                    initialGuess_x = int(initialWavePoints['N'+str(peak)+'_x'].values[0]*self.fs/1000)
+                                    guess_x = findNearestPeak(trace, initialGuess_x, negative=True  )
+                                    points['N'+str(peak)] = (guess_x/self.fs*1000,trace[guess_x])
+                                except ValueError:
+                                    points['N'+str(peak)] = (np.nan,np.nan)
 
                         # check if the entry exists and update it or create it :
                         selectedWavePoints = self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==intens) ]
@@ -846,37 +861,18 @@ class abrWindow(pg.GraphicsView):
                         initialIntens = intens
                         
                         if selectedWavePoints.shape[0] ==0:
+                            # Create new row with only the peaks we processed
+                            newRow = {'Freq':freq, 'Intensity':intens}
+                            for peakName in points:
+                                newRow[peakName+'_x'] = points[peakName][0]
+                                newRow[peakName+'_y'] = points[peakName][1]
                             self.wavePoints = pd.concat([self.wavePoints,
-                                pd.DataFrame({
-                                'Freq':freq,
-                                'Intensity':intens,
-                                'P1_x': points['P1'][0],
-                                'P1_y' : points['P1'][1],
-                                'N1_x': points['N1'][0],
-                                'N1_y' : points['N1'][1],
-
-                                'P2_x': points['P2'][0],
-                                'P2_y' : points['P2'][1],
-                                'N2_x': points['N2'][0],
-                                'N2_y' : points['N2'][1],
-
-                                'P3_x': points['P3'][0],
-                                'P3_y' : points['P3'][1],
-                                'N3_x': points['N3'][0],
-                                'N3_y' : points['N3'][1],
-
-                                'P4_x': points['P4'][0],    
-                                'P4_y' : points['P4'][1],
-                                'N4_x': points['N4'][0],
-                                'N4_y' : points['N4'][1],                
-
-                                },index=[0])],ignore_index=True,axis=0)
+                                pd.DataFrame(newRow, index=[0])], ignore_index=True, axis=0)
                         elif selectedWavePoints.shape[0] ==1:
-                            for ii in [1,2,3,4]:
-                                self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==intens),'P'+str(ii)+'_x'] =  points['P'+str(ii)][0]
-                                self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==intens) ,'N'+str(ii)+'_x'] =  points['N'+str(ii)][0]
-                                self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==intens) ,'P'+str(ii)+'_y'] =  points['P'+str(ii)][1]
-                                self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==intens) ,'N'+str(ii)+'_y'] =  points['N'+str(ii)][1]
+                            # Only update the peaks that were processed
+                            for peakName in points:
+                                self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==intens), peakName+'_x'] = points[peakName][0]
+                                self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==intens), peakName+'_y'] = points[peakName][1]
                 except KeyError:
                     pass
 

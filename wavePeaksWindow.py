@@ -30,6 +30,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
     changeTraceSignal = QtCore.pyqtSignal(str)
     guessAboveSignal = QtCore.pyqtSignal()
     guessBelowSignal = QtCore.pyqtSignal()
+    propagatePointSignal = QtCore.pyqtSignal(str)
 
     def __init__(self, parent=None, show=True, size=None, title=None, **kargs):
         super().__init__(parent, show, size, title, **kargs)
@@ -143,6 +144,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
             [   {'name':'x','type':'float','value':0},
                 {'name':'y','type':'float','value':0},
                 {'name':'RESET','type':'action'},
+                {'name':'PROPAGATE','type':'action'},
         ]
         
         },
@@ -151,6 +153,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
             [    {'name':'x','type':'float','value':0},
                 {'name':'y','type':'float','value':0},
                 {'name':'RESET','type':'action'},
+                {'name':'PROPAGATE','type':'action'},
         ]
         
         },
@@ -159,6 +162,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
             [    {'name':'x','type':'float','value':0},
                 {'name':'y','type':'float','value':0},
                 {'name':'RESET','type':'action'},
+                {'name':'PROPAGATE','type':'action'},
         ]
         
         },
@@ -166,6 +170,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
             [    {'name':'x','type':'float','value':0},
                 {'name':'y','type':'float','value':0},
                 {'name':'RESET','type':'action'},
+                {'name':'PROPAGATE','type':'action'},
         ]
         
         },
@@ -174,6 +179,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
             [    {'name':'x','type':'float','value':0},
                 {'name':'y','type':'float','value':0},
                 {'name':'RESET','type':'action'},
+                {'name':'PROPAGATE','type':'action'},
         ]
         
         },
@@ -181,6 +187,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
             [    {'name':'x','type':'float','value':0},
                 {'name':'y','type':'float','value':0},
                 {'name':'RESET','type':'action'},
+                {'name':'PROPAGATE','type':'action'},
      ]
         
         },
@@ -189,6 +196,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
             [    {'name':'x','type':'float','value':0},
                 {'name':'y','type':'float','value':0},
                 {'name':'RESET','type':'action'},
+                {'name':'PROPAGATE','type':'action'},
         ]
         
         },
@@ -199,6 +207,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
             [    {'name':'x','type':'float','value':0},
                 {'name':'y','type':'float','value':0},
                 {'name':'RESET','type':'action'},
+                {'name':'PROPAGATE','type':'action'},
         ]
         
         },
@@ -227,6 +236,15 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         self.p.keys()['N2'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('N2'))
         self.p.keys()['N3'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('N3'))
         self.p.keys()['N4'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('N4'))
+
+        self.p.keys()['P1'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('P1'))
+        self.p.keys()['P2'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('P2'))
+        self.p.keys()['P3'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('P3'))
+        self.p.keys()['P4'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('P4'))
+        self.p.keys()['N1'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('N1'))
+        self.p.keys()['N2'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('N2'))
+        self.p.keys()['N3'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('N3'))
+        self.p.keys()['N4'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('N4'))
 
     def nextPeakType(self):
         if self.p['Peak type'] == 'P1':
