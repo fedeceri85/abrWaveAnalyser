@@ -1,7 +1,7 @@
 from PyQt5.Qt import QApplication
 from PyQt5.QtCore import Qt, QSettings
 from PyQt5 import QtGui, QtWidgets
-from PyQt5.QtWidgets import QMainWindow, QDockWidget, QSplitter, QStatusBar, QWidget, QVBoxLayout, QFileDialog
+from PyQt5.QtWidgets import QMainWindow, QDockWidget, QSplitter, QStatusBar, QWidget, QVBoxLayout, QFileDialog, QMessageBox
 from pyqtgraph.parametertree import Parameter, ParameterTree
 import numpy as np
 import sys
@@ -341,11 +341,23 @@ class abrWindow(QMainWindow):
         self.layout = None  # Will be set when data is loaded
         self.outerlayout = None
         
+        
         # Restore window geometry and dock state from settings
         self._restoreWindowState()
         
         self.makeConnections()
+        
+        # Track unsaved changes
+        self.unsavedChanges = False
+        self.waveAnalysisWidget.finishSignal.connect(self.markUnsaved)
+        
         self.show()
+
+    def markUnsaved(self):
+        """Mark that there are unsaved changes."""
+        if not self.unsavedChanges:
+            self.unsavedChanges = True
+            self.setWindowTitle(self.windowTitle() + " *")
     
     def createMenuBar(self):
         """Create the application menu bar."""
@@ -393,9 +405,37 @@ class abrWindow(QMainWindow):
             self.resizeDocks([self.waveformDock, self.fileDock], [waveHeight, controlHeight], Qt.Vertical)
         except (ValueError, TypeError):
             pass # Fallback to defaults defined in __init__
+            
+    def checkUnsavedChanges(self):
+        """
+        Check for unsaved changes and prompt the user.
+        Returns True if safe to proceed (Saved, Discarded, or No Changes), False if Cancelled.
+        """
+        if self.unsavedChanges:
+            msg = "You have unsaved changes to the analysis.\nDo you want to save them before proceeding?"
+            reply = QMessageBox.warning(
+                self, 
+                "Unsaved Changes", 
+                msg, 
+                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, 
+                QMessageBox.Save
+            )
+            
+            if reply == QMessageBox.Save:
+                self.saveResultsCb()
+                return True
+            elif reply == QMessageBox.Discard:
+                return True
+            else: # Cancel
+                return False
+        return True
     
     def closeEvent(self, event):
         """Save window geometry and dock sizes."""
+        if not self.checkUnsavedChanges():
+            event.ignore()
+            return
+            
         settings = getSettings()
         
         # Save window geometry
@@ -409,6 +449,9 @@ class abrWindow(QMainWindow):
         event.accept()
 
     def openFileCb(self):
+        if not self.checkUnsavedChanges():
+            return
+            
         self.multipleFilesMode = False
         
         # Get last used folder from settings
@@ -437,6 +480,9 @@ class abrWindow(QMainWindow):
             self.initData()
 
     def openMultipleFilesCb(self):
+        if not self.checkUnsavedChanges():
+            return
+            
         self.multipleFilesMode = True
         
         # Get last used folder from settings
@@ -477,6 +523,9 @@ class abrWindow(QMainWindow):
         self.initData()
 
     def nextFileCb(self):
+        if not self.checkUnsavedChanges():
+            return
+            
         self.currentFileIndex+=1
         if self.currentFileIndex == self.totalFiles:
             self.currentFileIndex = 0
@@ -484,6 +533,9 @@ class abrWindow(QMainWindow):
         self.openFileFromMultiple()
 
     def prevFileCb(self):
+        if not self.checkUnsavedChanges():
+            return
+            
         self.currentFileIndex-=1
         if self.currentFileIndex == -1:
             self.currentFileIndex = self.totalFiles-1
@@ -491,6 +543,10 @@ class abrWindow(QMainWindow):
         self.openFileFromMultiple()
     
     def initData(self):
+        # Reset unsaved changes flag since we are loading a new file
+        self.unsavedChanges = False
+        self.setWindowTitle("ABR Wave Analyser") # Reset title (remove *)
+        
         try:
             self.abr,self.fs = at.extractABR(os.path.join(self.folder,self.currentFile))
         except:
@@ -734,6 +790,10 @@ class abrWindow(QMainWindow):
 
         filename2 = os.path.splitext(self.currentFile)[0]+'_thresholds.csv'
         self.threshDict.to_frame().T.to_csv(os.path.join(self.folder,filename2),index=None)
+        
+        # Mark as saved
+        self.unsavedChanges = False
+        self.setWindowTitle(self.windowTitle().replace(" *", ""))
         
     def saveResultsMultipleCb(self):
         rows = []
@@ -1064,6 +1124,7 @@ class abrWindow(QMainWindow):
         freq,initialIntens = self.plotToFreqIntMap[self.activeRowCol]
         self.threshDict[str(int(freq))] = initialIntens
         self.updateCurrentPlotCb()
+        self.markUnsaved()
 
     def setAboveThresholdCb(self):
         freqs = []
@@ -1075,6 +1136,7 @@ class abrWindow(QMainWindow):
         freq,initialIntens = self.plotToFreqIntMap[self.activeRowCol]
         self.threshDict[str(int(freq))] = max(intens)+5
         self.updateCurrentPlotCb()
+        self.markUnsaved()
 
     def resetPointBelowCb(self, peakName):
         """Reset a specific peak and its pair for the current intensity and all lower intensities.
