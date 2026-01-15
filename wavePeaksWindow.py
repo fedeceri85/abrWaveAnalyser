@@ -31,6 +31,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
     guessAboveSignal = QtCore.pyqtSignal()
     guessBelowSignal = QtCore.pyqtSignal()
     propagatePointSignal = QtCore.pyqtSignal(str)
+    resetPointBelowSignal = QtCore.pyqtSignal(str)
 
     def __init__(self, parent=None, show=True, size=None, title=None, **kargs):
         super().__init__(parent, show, size, title, **kargs)
@@ -130,13 +131,29 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         self.p1.addItem(n4Point)
         n4Point.setData([0],[0])
 
+        p5Label = pg.TextItem("P5",color = 'k')
+        p5Label.setFont(font)
+        p5Point = pg.ScatterPlotItem(x=[],y=[])
+        p5Label.setPos(np.nan,np.nan)
+        self.p1.addItem(p5Label)
+        self.p1.addItem(p5Point)
+        p5Point.setData([0],[0])
 
-        self.labelDict = {'P1':p1Label,'P2':p2Label,'P3':p3Label,'P4':p4Label,'N1':n1Label,'N2':n2Label,'N3':n3Label,'N4':n4Label}
-        self.pointDict =  {'P1':p1Point,'P2':p2Point,'P3':p3Point,'P4':p4Point,'N1':n1Point,'N2':n2Point,'N3':n3Point,'N4':n4Point}
+        n5Label = pg.TextItem("N5",color = 'k')
+        n5Label.setFont(font)
+        n5Point = pg.ScatterPlotItem(x=[],y=[],symbol='+',pen=pg.mkPen('r'),size=13,brush=pg.mkBrush('r'))
+        n5Label.setPos(np.nan,np.nan)
+        self.p1.addItem(n5Label)
+        self.p1.addItem(n5Point)
+        n5Point.setData([0],[0])
+
+
+        self.labelDict = {'P1':p1Label,'P2':p2Label,'P3':p3Label,'P4':p4Label,'P5':p5Label,'N1':n1Label,'N2':n2Label,'N3':n3Label,'N4':n4Label,'N5':n5Label}
+        self.pointDict =  {'P1':p1Point,'P2':p2Point,'P3':p3Point,'P4':p4Point,'P5':p5Point,'N1':n1Point,'N2':n2Point,'N3':n3Point,'N4':n4Point,'N5':n5Point}
 
     def initParameterWindow(self):
         params = [
-        {'name':'Peak type','type':'list','values':['P1','N1','P2','N2','P3','N3','P4','N4']},
+        {'name':'Peak type','type':'list','values':['P1','N1','P2','N2','P3','N3','P4','N4','P5','N5']},
         {'name':'Auto find peak','type':'bool','value':True},
         {'name':'RESET ALL POINTS','type':'action'},
         {'name':'RESET ALL LOWER INTENSITIES','type':'action'},
@@ -145,6 +162,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
                 {'name':'y','type':'float','value':0},
                 {'name':'RESET','type':'action'},
                 {'name':'PROPAGATE','type':'action'},
+                {'name':'RESET BELOW','type':'action'},
         ]
         
         },
@@ -154,6 +172,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
                 {'name':'y','type':'float','value':0},
                 {'name':'RESET','type':'action'},
                 {'name':'PROPAGATE','type':'action'},
+                {'name':'RESET BELOW','type':'action'},
         ]
         
         },
@@ -163,6 +182,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
                 {'name':'y','type':'float','value':0},
                 {'name':'RESET','type':'action'},
                 {'name':'PROPAGATE','type':'action'},
+                {'name':'RESET BELOW','type':'action'},
         ]
         
         },
@@ -171,6 +191,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
                 {'name':'y','type':'float','value':0},
                 {'name':'RESET','type':'action'},
                 {'name':'PROPAGATE','type':'action'},
+                {'name':'RESET BELOW','type':'action'},
         ]
         
         },
@@ -180,6 +201,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
                 {'name':'y','type':'float','value':0},
                 {'name':'RESET','type':'action'},
                 {'name':'PROPAGATE','type':'action'},
+                {'name':'RESET BELOW','type':'action'},
         ]
         
         },
@@ -188,6 +210,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
                 {'name':'y','type':'float','value':0},
                 {'name':'RESET','type':'action'},
                 {'name':'PROPAGATE','type':'action'},
+                {'name':'RESET BELOW','type':'action'},
      ]
         
         },
@@ -197,6 +220,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
                 {'name':'y','type':'float','value':0},
                 {'name':'RESET','type':'action'},
                 {'name':'PROPAGATE','type':'action'},
+                {'name':'RESET BELOW','type':'action'},
         ]
         
         },
@@ -208,6 +232,27 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
                 {'name':'y','type':'float','value':0},
                 {'name':'RESET','type':'action'},
                 {'name':'PROPAGATE','type':'action'},
+                {'name':'RESET BELOW','type':'action'},
+        ]
+        
+        },
+
+            {'name':'P5','type':'group','children':
+            [    {'name':'x','type':'float','value':0},
+                {'name':'y','type':'float','value':0},
+                {'name':'RESET','type':'action'},
+                {'name':'PROPAGATE','type':'action'},
+                {'name':'RESET BELOW','type':'action'},
+        ]
+        
+        },
+
+            {'name':'N5','type':'group','children':
+            [    {'name':'x','type':'float','value':0},
+                {'name':'y','type':'float','value':0},
+                {'name':'RESET','type':'action'},
+                {'name':'PROPAGATE','type':'action'},
+                {'name':'RESET BELOW','type':'action'},
         ]
         
         },
@@ -232,19 +277,34 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         self.p.keys()['P2'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('P2'))
         self.p.keys()['P3'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('P3'))
         self.p.keys()['P4'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('P4'))
+        self.p.keys()['P5'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('P5'))
         self.p.keys()['N1'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('N1'))
         self.p.keys()['N2'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('N2'))
         self.p.keys()['N3'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('N3'))
         self.p.keys()['N4'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('N4'))
+        self.p.keys()['N5'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('N5'))
 
         self.p.keys()['P1'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('P1'))
         self.p.keys()['P2'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('P2'))
         self.p.keys()['P3'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('P3'))
         self.p.keys()['P4'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('P4'))
+        self.p.keys()['P5'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('P5'))
         self.p.keys()['N1'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('N1'))
         self.p.keys()['N2'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('N2'))
         self.p.keys()['N3'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('N3'))
         self.p.keys()['N4'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('N4'))
+        self.p.keys()['N5'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('N5'))
+
+        self.p.keys()['P1'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('P1'))
+        self.p.keys()['P2'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('P2'))
+        self.p.keys()['P3'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('P3'))
+        self.p.keys()['P4'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('P4'))
+        self.p.keys()['P5'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('P5'))
+        self.p.keys()['N1'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('N1'))
+        self.p.keys()['N2'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('N2'))
+        self.p.keys()['N3'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('N3'))
+        self.p.keys()['N4'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('N4'))
+        self.p.keys()['N5'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('N5'))
 
     def nextPeakType(self):
         if self.p['Peak type'] == 'P1':
@@ -262,6 +322,10 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         elif self.p['Peak type'] == 'P4':
             self.p['Peak type'] = 'N4'
         elif self.p['Peak type'] == 'N4':
+            self.p['Peak type'] = 'P5'
+        elif self.p['Peak type'] == 'P5':
+            self.p['Peak type'] = 'N5'
+        elif self.p['Peak type'] == 'N5':
             self.p['Peak type'] = 'P1'
 
     def onClick(self,event):
@@ -321,6 +385,10 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
             self.p['Peak type'] = 'P4'
         elif ev.key() == Qt.Key_8:
             self.p['Peak type'] = 'N4'
+        elif ev.key() == Qt.Key_9:
+            self.p['Peak type'] = 'P5'
+        elif ev.key() == Qt.Key_0:
+            self.p['Peak type'] = 'N5'
         
         elif  ev.key() == Qt.Key_E:
             self.nextPeakType()
@@ -338,14 +406,14 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
             self.finishSignal.emit()
 
     def resetAllPoints(self):
-        for point in ['P1','N1','P2','N2','P3','N3','P4','N4']:
+        for point in ['P1','N1','P2','N2','P3','N3','P4','N4','P5','N5']:
             self.resetPoint(point,emitSignal=False)
         self.finishSignal.emit()
     
     def resetAllPointsLowerInt(self):
         for i in range(22): # TODO: If there are more than 22 intensities this will fail
             self.changeTraceSignal.emit('Down')
-            for point in ['P1','N1','P2','N2','P3','N3','P4','N4']:
+            for point in ['P1','N1','P2','N2','P3','N3','P4','N4','P5','N5']:
                 self.resetPoint(point,emitSignal=False)
             self.finishSignal.emit()
 
@@ -366,7 +434,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
 
     def getPoints(self):
         outDict = {}
-        for point in ['P1','N1','P2','N2','P3','N3','P4','N4']:
+        for point in ['P1','N1','P2','N2','P3','N3','P4','N4','P5','N5']:
             outDict[point] = self.getPoint(point)
         return outDict
 
@@ -378,7 +446,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
        
 
         if wavePoints is not None:
-            for point in ['P1','N1','P2','N2','P3','N3','P4','N4']:
+            for point in ['P1','N1','P2','N2','P3','N3','P4','N4','P5','N5']:
                 if wavePoints[point+'_x'].isna().values[0]==False:
                     self.setPoint(point,wavePoints[point+'_x'].values[0],wavePoints[point+'_y'].values[0]) 
                 else:

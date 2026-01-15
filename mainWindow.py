@@ -190,8 +190,8 @@ def makeFigureqt(h1,h2,out,layout,title,fs,wavePoints = None,plotDict = None,wav
     return plots,wavePointsPlot,plotToFreqIntMap
 
 def wavePointsToScatter(wavePoints):
-    xlabels = ['P'+str(i)+'_x' for i in [1,2,3,4]] + ['N'+str(i)+'_x' for i in [1,2,3,4]]
-    ylabels = ['P'+str(i)+'_y' for i in [1,2,3,4]]  + ['N'+str(i)+'_y' for i in [1,2,3,4]]  
+    xlabels = ['P'+str(i)+'_x' for i in [1,2,3,4,5]] + ['N'+str(i)+'_x' for i in [1,2,3,4,5]]
+    ylabels = ['P'+str(i)+'_y' for i in [1,2,3,4,5]]  + ['N'+str(i)+'_y' for i in [1,2,3,4,5]]  
     x = wavePoints[xlabels].values[0,:]
     y = wavePoints[ylabels].values[0,:]
     return (x,y)
@@ -414,8 +414,14 @@ class abrWindow(pg.GraphicsView):
         try: 
             filename = os.path.splitext(self.currentFile)[0]+'_waveAnalysisResults.csv'
             self.wavePoints = pd.read_csv(os.path.join(self.folder,filename))
+            
+            # Handle backward compatibility: add P5/N5 columns if missing (for old files)
+            for col in ['P5_x', 'P5_y', 'N5_x', 'N5_y']:
+                if col not in self.wavePoints.columns:
+                    self.wavePoints[col] = np.nan
+                    
         except FileNotFoundError:
-            self.wavePoints = pd.DataFrame(columns=['Freq',	'Intensity','P1_x','P1_y','N1_x','N1_y','P2_x','P2_y','N2_x','N2_y','P3_x','P3_y','N3_x','N3_y','P4_x','P4_y','N4_x','N4_y'])
+            self.wavePoints = pd.DataFrame(columns=['Freq',	'Intensity','P1_x','P1_y','N1_x','N1_y','P2_x','P2_y','N2_x','N2_y','P3_x','P3_y','N3_x','N3_y','P4_x','P4_y','N4_x','N4_y','P5_x','P5_y','N5_x','N5_y'])
             print('Wave analysis not found')
 
 
@@ -510,6 +516,7 @@ class abrWindow(pg.GraphicsView):
         self.waveAnalysisWidget.guessAboveSignal.connect(lambda: self.guessWavePoints('higher'))
         self.waveAnalysisWidget.guessBelowSignal.connect(lambda: self.guessWavePoints('lower'))
         self.waveAnalysisWidget.propagatePointSignal.connect(lambda peak: self.guessWavePoints('lower', peaks=[peak]))
+        self.waveAnalysisWidget.resetPointBelowSignal.connect(self.resetPointBelowCb)
 
 
 
@@ -617,13 +624,18 @@ class abrWindow(pg.GraphicsView):
                     'P4_x': points['P4'][0],    
                     'P4_y' : points['P4'][1],
                     'N4_x': points['N4'][0],
-                    'N4_y' : points['N4'][1],                
+                    'N4_y' : points['N4'][1],
+
+                    'P5_x': points['P5'][0],    
+                    'P5_y' : points['P5'][1],
+                    'N5_x': points['N5'][0],
+                    'N5_y' : points['N5'][1],                
 
             },index=[0])],ignore_index=True,axis=0)
       
 
         elif selectedWavePoints.shape[0] ==1:
-            for ii in [1,2,3,4]:
+            for ii in [1,2,3,4,5]:
                 self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==intens),'P'+str(ii)+'_x'] =  points['P'+str(ii)][0]
                 self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==intens) ,'N'+str(ii)+'_x'] =  points['N'+str(ii)][0]
                 self.wavePoints.loc[(self.wavePoints['Freq']==freq) & (self.wavePoints['Intensity']==intens) ,'P'+str(ii)+'_y'] =  points['P'+str(ii)][1]
@@ -817,7 +829,7 @@ class abrWindow(pg.GraphicsView):
 
         # Determine which peaks to process
         if peaks is None:
-            peaksToProcess = ['P1', 'N1', 'P2', 'N2', 'P3', 'N3', 'P4', 'N4']
+            peaksToProcess = ['P1', 'N1', 'P2', 'N2', 'P3', 'N3', 'P4', 'N4', 'P5', 'N5']
         else:
             peaksToProcess = peaks
 
@@ -836,7 +848,7 @@ class abrWindow(pg.GraphicsView):
                     if (intens>=lowerLimit) & (intens<=higherLimit):
                         print((freq,intens))
                         points = {}
-                        for peak in [1,2,3,4]:
+                        for peak in [1,2,3,4,5]:
                             # Only process P peaks that are in peaksToProcess
                             if 'P'+str(peak) in peaksToProcess:
                                 try:
@@ -894,6 +906,28 @@ class abrWindow(pg.GraphicsView):
         freq,initialIntens = self.plotToFreqIntMap[self.activeRowCol]
         self.threshDict[str(int(freq))] = max(intens)+5
         self.updateCurrentPlotCb()
+
+    def resetPointBelowCb(self, peakName):
+        """Reset a specific peak for the current intensity and all lower intensities.
+        
+        Args:
+            peakName: The peak to reset, e.g., 'P1', 'N1', etc.
+        """
+        freq, initialIntens = self.plotToFreqIntMap[self.activeRowCol]
+        threshold = self.threshDict[str(int(freq))]
+        
+        # Reset the peak for all intensities from threshold up to (and including) current intensity
+        for intens in self.intensities:
+            if intens >= threshold and intens <= initialIntens:
+                # Check if entry exists
+                mask = (self.wavePoints['Freq'] == freq) & (self.wavePoints['Intensity'] == intens)
+                if mask.any():
+                    # Set the specific peak to NaN
+                    self.wavePoints.loc[mask, peakName + '_x'] = np.nan
+                    self.wavePoints.loc[mask, peakName + '_y'] = np.nan
+        
+        self.updateCurrentPlotCb()
+        self.setActivePlot(self.activeRowCol[0], self.activeRowCol[1])
 
     def reversePolarityCb(self):
         
