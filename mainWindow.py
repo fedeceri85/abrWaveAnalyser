@@ -9,6 +9,7 @@ sys.path.append('../')
 import abrTools as at
 import os
 import pyqtgraph as pg
+import pyqtgraph.exporters
 from pyqtgraph.Qt import QtCore, QtWidgets as pgQtWidgets
 from wavePeaksWindow import myGLW, findNearestPeak
 import pandas as pd
@@ -256,6 +257,7 @@ class abrWindow(QMainWindow):
             {'name': 'Single file mode', 'type': 'group', 'children': [
                 {'name': 'Open file', 'type': 'action'},
                 {'name': 'Save ABR traces', 'type': 'action'},
+                {'name': 'Save ABR plot', 'type': 'action'},
                 {'name': 'Save results', 'type': 'action'},
             ]},
             {'name': 'Multiple file mode', 'type': 'group', 'children': [
@@ -709,6 +711,7 @@ class abrWindow(QMainWindow):
         self.p.keys()['ML threshold (experimental)'].sigActivated.connect(self.MLGuessThresholdsCb)
         self.p.keys()['X-axis lim (ms)'].sigValueChanged.connect(self.changeXlimCb)
         self.pFile.param('Single file mode').param('Save ABR traces').sigActivated.connect(self.saveABRTracesCb)
+        self.pFile.param('Single file mode').param('Save ABR plot').sigActivated.connect(self.saveABRPlotCb)
         self.pFile.param('Single file mode').param('Save results').sigActivated.connect(self.saveResultsCb)
         self.pFile.param('Multiple file mode').param('Open experiment list').sigActivated.connect(self.openMultipleFilesCb)
         self.pFile.param('Multiple file mode').param('Next file').sigActivated.connect(self.nextFileCb)
@@ -1249,6 +1252,30 @@ class abrWindow(QMainWindow):
             self.threshDict[str(int(freq))] = thresh
         self.updateCurrentPlotCb()
     
+    def saveABRPlotCb(self):
+        """Save the current ABR plot as a TIF image."""
+        try:
+            # Construct filename: data filename_abrplot.tif
+            baseName = os.path.splitext(self.currentFile)[0]
+            filename = f"{baseName}_abrplot.tif"
+            fullPath = os.path.join(self.folder, filename)
+            
+            # Create an exporter for the layout
+            exporter = pg.exporters.ImageExporter(self.outerlayout)
+            
+            # Save the file
+            exporter.export(fullPath)
+            
+            # Show success message
+            self.statusBar.showMessage(f"Plot saved to: {filename}")
+            print(f"Plot saved to: {fullPath}")
+            
+        except Exception as e:
+            msg = f"Error saving plot: {str(e)}"
+            self.statusBar.showMessage(msg)
+            print(msg)
+            QMessageBox.critical(self, "Error", msg)
+
     def saveABRTracesCb(self,_):
         dlg = QtWidgets.QFileDialog()
         dlg.setFileMode(QtWidgets.QFileDialog.Directory)
