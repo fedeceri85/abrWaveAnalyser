@@ -498,6 +498,8 @@ class abrWindow(QMainWindow):
             filenames = dlg.selectedFiles()
             print(filenames)
             self.experimentList = pd.read_csv(filenames[0])
+            if 'Group' in self.experimentList.columns:
+                self.experimentList['Group'] = self.experimentList['Group'].astype(str)
             self.pFile.param('Multiple file mode').param('Next file').setOpts(enabled=True) 
             self.pFile.param('Multiple file mode').param('Previous file').setOpts(enabled=True)
 
@@ -1339,24 +1341,28 @@ class abrWindow(QMainWindow):
         # For each group
         if dlg.exec_():
             folder = dlg.selectedFiles()[0]
-            for group in groups:
+            for group_value in groups:
                 # Create an Excel writer object for this group
                 # Remove any / or \ from group name for valid filename
-                safe_group = group.replace('/', '_').replace('\\', '_')
+                safe_group = group_value.replace('/', '_').replace('\\', '_')
                 
                 # Create Excel file with sanitized group name
                 with pd.ExcelWriter(os.path.join(folder,f'{safe_group}.xlsx')) as writer:
+                    wrote_sheet = False
 
                     # Get unique frequencies for this group
-                    frequencies = final_df[final_df['Group'] == group]['Frequency'].unique()
+                    frequencies = final_df[final_df['Group'] == group_value]['Frequency'].unique()
                     
                     # For each frequency
                     for freq in frequencies:
                         # Filter data for this group and frequency
                         df_sheet = final_df[
-                            (final_df['Group'] == group) & 
+                            (final_df['Group'] == group_value) & 
                             (final_df['Frequency'] == freq)
                         ]
+                        if df_sheet.empty:
+                            continue
+
                         # Swap the order of levels in the columns MultiIndex
                         pivoted_df = df_sheet.pivot(index=['Group', 'Frequency', 'Time (ms)'], columns='Sound level (dB SPL)', values=['mean', 'std','count'])
                         pivoted_df.columns = pivoted_df.columns.swaplevel(0, 1)
@@ -1369,6 +1375,12 @@ class abrWindow(QMainWindow):
                         
                         # Save to a sheet named after the frequency
                         pivoted_df.to_excel(writer, sheet_name=f'{freq}', index=True)
+                        wrote_sheet = True
+
+                    if not wrote_sheet:
+                        pd.DataFrame({
+                            'message': ['No rows available for this group with the current filters.']
+                        }).to_excel(writer, sheet_name='Summary', index=False)
 
 
     def plotAverageABRTracesCb(self,_):
