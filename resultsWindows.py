@@ -128,8 +128,25 @@ class resultAverageTraceWindow(QtWidgets.QMainWindow):
         axs = None
         colors = ['#DC3220', '#005AB5', '#FFA500', '#009E73', '#9370DB', '#E6AB02', '#56B4E9', '#8B0000', '#00BFFF', '#32CD32',
                   '#FF69B4', '#4B0082', '#FF4500', '#008080', '#FFD700', '#8B4513', '#00CED1', '#FF1493', '#556B2F', '#9932CC']
+        
+        #Determine the number of unique frequnecies and intensities across all abr_traces to set up the subplots correctly
+        freqs = []
+        ints = []
+        for abr in abr_traces:
+            h1 = abr.index.get_level_values(0)
+            h2 = abr.index.get_level_values(1)
+            frequency = list(set(h1))
+            intensity = list(set(h2))
+            freqs.extend(frequency)
+            ints.extend(intensity)
+
+        freqs = list(set(freqs))
+        ints = list(set(ints))
+
+        fig,axs = plt.subplots(len(ints),len(freqs),sharex=False, sharey=False,subplot_kw={'xticks': [], 'yticks': []},figsize=np.array([ 15.8 ,  16.35]))
+
         for j,abr_trace in enumerate(abr_traces):
-            fig,axs = makeFigureErrorBar(abr_trace,err=abr_traces_err[j],fig=fig,axs=axs,linecolor=colors[j])
+            fig,axs = makeFigureErrorBar(abr_trace,err=abr_traces_err[j],fig=fig,axs=axs,linecolor=colors[j],frequency=freqs,intensity=ints)
         self.fig = fig
         if group_labels is not None:
             for i in range(len(group_labels)):
@@ -147,18 +164,22 @@ class resultAverageTraceWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(self.main_widget)
 
 
-def makeFigureErrorBar(abr_df,title='',fig=None,axs=None,linecolor = 'k',err=None):
+def makeFigureErrorBar(abr_df,title='',fig=None,axs=None,linecolor = 'k',err=None,frequency=None,intensity=None):
     '''
     Make a figure from ABR trace data
     '''
 
+
     h1 = abr_df.index.get_level_values(0)
+
     h2 = abr_df.index.get_level_values(1)
     out = abr_df.values
 
-    frequency = list(set(h1))
+    if frequency is None:
+        frequency = list(set(h1))
     frequency.sort()
-    intensity = list(set(h2))
+    if intensity is None:
+        intensity = list(set(h2))
     intensity.sort()
     nint = len(intensity)
     nfreq=len(frequency)
