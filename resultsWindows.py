@@ -6,6 +6,20 @@ import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 
+def fitWindowToScreen(window, preferredWidth=1300, preferredHeight=1000, fillRatio=0.92):
+    """Size and center result windows inside the available desktop area."""
+    screen = QApplication.primaryScreen().availableGeometry()
+    width = min(preferredWidth, max(640, int(screen.width() * fillRatio)))
+    height = min(preferredHeight, max(480, int(screen.height() * fillRatio)))
+    width = min(width, screen.width())
+    height = min(height, screen.height())
+
+    window.setGeometry(0, 0, width, height)
+    window.move(screen.center().x() - window.width()//2,
+                screen.center().y() - window.height()//2)
+    return width, height
+
+
 class resultWindow(QtWidgets.QMainWindow):
     def __init__(self, wavepoints,group=None,kind='scatter'):
         '''
@@ -15,11 +29,7 @@ class resultWindow(QtWidgets.QMainWindow):
         super().__init__()
 
         self.setWindowTitle('ABR Wave Analysis - Results') 
-        self.setGeometry(0,0,1300,1000)
-        # Center the window on the screen
-        screen = QApplication.primaryScreen().geometry()
-        self.move(screen.center().x() - self.width()//2,
-                 screen.center().y() - self.height()//2)
+        fitWindowToScreen(self)
         self.main_widget = QtWidgets.QWidget(self)
 
         wavepoints2 = wavepoints.copy()
@@ -80,11 +90,7 @@ class resultThresholdWindow(QtWidgets.QMainWindow):
         super().__init__()
 
         self.setWindowTitle('ABR thresholds - Results') 
-        self.setGeometry(0,0,1300,1000)
-        # Center the window on the screen
-        screen = QApplication.primaryScreen().geometry()
-        self.move(screen.center().x() - self.width()//2,
-                 screen.center().y() - self.height()//2)
+        fitWindowToScreen(self)
         self.main_widget = QtWidgets.QWidget(self)
         if group is not None:
             fg = sns.catplot(data=thresholds,x='Freq',y='Threshold',hue=group,kind='point',errorbar='sd')
@@ -116,11 +122,7 @@ class resultAverageTraceWindow(QtWidgets.QMainWindow):
         super().__init__()
 
         self.setWindowTitle('ABR avg traces - Results') 
-        self.setGeometry(0,0,1300,1000)
-        # Center the window on the screen
-        screen = QApplication.primaryScreen().geometry()
-        self.move(screen.center().x() - self.width()//2,
-                 screen.center().y() - self.height()//2)
+        windowWidth, windowHeight = fitWindowToScreen(self)
         self.main_widget = QtWidgets.QWidget(self)
 
         #fg = sns.relplot(data=abr_traces,x='Time (ms)',y='Amplitude (uV)',col='Frequency',row='Sound level (dB SPL)',hue=group,kind='line',errorbar='sd')
@@ -143,7 +145,8 @@ class resultAverageTraceWindow(QtWidgets.QMainWindow):
         freqs = list(set(freqs))
         ints = list(set(ints))
 
-        fig,axs = plt.subplots(len(ints),len(freqs),sharex=False, sharey=False,subplot_kw={'xticks': [], 'yticks': []},figsize=np.array([ 15.8 ,  16.35]))
+        figureSize = np.array([max(8, windowWidth / 100), max(6, windowHeight / 100)])
+        fig,axs = plt.subplots(len(ints),len(freqs),sharex=False, sharey=False,subplot_kw={'xticks': [], 'yticks': []},figsize=figureSize)
 
         for j,abr_trace in enumerate(abr_traces):
             fig,axs = makeFigureErrorBar(abr_trace,err=abr_traces_err[j],fig=fig,axs=axs,linecolor=colors[j],frequency=freqs,intensity=ints)
@@ -231,4 +234,3 @@ def makeFigureErrorBar(abr_df,title='',fig=None,axs=None,linecolor = 'k',err=Non
 
     plt.tight_layout()
     return fig,axs
-

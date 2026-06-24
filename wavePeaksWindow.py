@@ -32,6 +32,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
     guessBelowSignal = QtCore.pyqtSignal()
     propagatePointSignal = QtCore.pyqtSignal(str)
     resetPointBelowSignal = QtCore.pyqtSignal(str)
+    PEAK_NAMES = ['P1','N1','P2','N2','P3','N3','P4','N4','P5','N5']
 
     def __init__(self, parent=None, show=True, size=None, title=None, embedded=False, **kargs):
         # When embedded, we don't want to show as a separate window
@@ -156,117 +157,41 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         self.pointDict =  {'P1':p1Point,'P2':p2Point,'P3':p3Point,'P4':p4Point,'P5':p5Point,'N1':n1Point,'N2':n2Point,'N3':n3Point,'N4':n4Point,'N5':n5Point}
 
     def initParameterWindow(self):
+        pointParams = []
+        for point in self.PEAK_NAMES:
+            pointParams.append({'name': point, 'type': 'group', 'children': [
+                {'name': 'x', 'type': 'float', 'value': 0},
+                {'name': 'y', 'type': 'float', 'value': 0},
+            ]})
+
         params = [
-        {'name':'Peak type','type':'list','values':['P1','N1','P2','N2','P3','N3','P4','N4','P5','N5']},
-        {'name':'Auto find peak','type':'bool','value':True},
-        {'name':'RESET ALL POINTS','type':'action'},
-        {'name':'RESET ALL LOWER INTENSITIES','type':'action'},
-        {'name':'P1','type':'group','children':
-            [   {'name':'x','type':'float','value':0},
-                {'name':'y','type':'float','value':0},
-                {'name':'RESET','type':'action'},
-                {'name':'PROPAGATE','type':'action'},
-                {'name':'RESET BELOW','type':'action'},
-        ]
-        
-        },
+            {'name': 'Peak type', 'type': 'list', 'values': self.PEAK_NAMES, 'value': 'P1'},
+            {'name': 'Auto find peak', 'type': 'bool', 'value': True},
+        ] + pointParams
 
-                {'name':'N1','type':'group','children':
-            [    {'name':'x','type':'float','value':0},
-                {'name':'y','type':'float','value':0},
-                {'name':'RESET','type':'action'},
-                {'name':'PROPAGATE','type':'action'},
-                {'name':'RESET BELOW','type':'action'},
-        ]
-        
-        },
-
-            {'name':'P2','type':'group','children':
-            [    {'name':'x','type':'float','value':0},
-                {'name':'y','type':'float','value':0},
-                {'name':'RESET','type':'action'},
-                {'name':'PROPAGATE','type':'action'},
-                {'name':'RESET BELOW','type':'action'},
-        ]
-        
-        },
-                {'name':'N2','type':'group','children':
-            [    {'name':'x','type':'float','value':0},
-                {'name':'y','type':'float','value':0},
-                {'name':'RESET','type':'action'},
-                {'name':'PROPAGATE','type':'action'},
-                {'name':'RESET BELOW','type':'action'},
-        ]
-        
-        },
-
-            {'name':'P3','type':'group','children':
-            [    {'name':'x','type':'float','value':0},
-                {'name':'y','type':'float','value':0},
-                {'name':'RESET','type':'action'},
-                {'name':'PROPAGATE','type':'action'},
-                {'name':'RESET BELOW','type':'action'},
-        ]
-        
-        },
-                {'name':'N3','type':'group','children':
-            [    {'name':'x','type':'float','value':0},
-                {'name':'y','type':'float','value':0},
-                {'name':'RESET','type':'action'},
-                {'name':'PROPAGATE','type':'action'},
-                {'name':'RESET BELOW','type':'action'},
-     ]
-        
-        },
-
-            {'name':'P4','type':'group','children':
-            [    {'name':'x','type':'float','value':0},
-                {'name':'y','type':'float','value':0},
-                {'name':'RESET','type':'action'},
-                {'name':'PROPAGATE','type':'action'},
-                {'name':'RESET BELOW','type':'action'},
-        ]
-        
-        },
-
-
-
-            {'name':'N4','type':'group','children':
-            [    {'name':'x','type':'float','value':0},
-                {'name':'y','type':'float','value':0},
-                {'name':'RESET','type':'action'},
-                {'name':'PROPAGATE','type':'action'},
-                {'name':'RESET BELOW','type':'action'},
-        ]
-        
-        },
-
-            {'name':'P5','type':'group','children':
-            [    {'name':'x','type':'float','value':0},
-                {'name':'y','type':'float','value':0},
-                {'name':'RESET','type':'action'},
-                {'name':'PROPAGATE','type':'action'},
-                {'name':'RESET BELOW','type':'action'},
-        ]
-        
-        },
-
-            {'name':'N5','type':'group','children':
-            [    {'name':'x','type':'float','value':0},
-                {'name':'y','type':'float','value':0},
-                {'name':'RESET','type':'action'},
-                {'name':'PROPAGATE','type':'action'},
-                {'name':'RESET BELOW','type':'action'},
-        ]
-        
-        },
-
-
-        ]
-        ## Create tree of Parameter objects
+        # Canonical parameter store. The individual P/N groups are kept here so
+        # existing save/load code can continue to read and write the same fields.
         self.p = Parameter.create(name='params', type='group', children=params)
+
+        controls = [
+            {'name': 'Peak type', 'type': 'list', 'values': self.PEAK_NAMES, 'value': 'P1'},
+            {'name': 'Auto find peak', 'type': 'bool', 'value': True},
+            {'name': 'Selected peak', 'type': 'group', 'children': [
+                {'name': 'x', 'type': 'float', 'value': 0},
+                {'name': 'y', 'type': 'float', 'value': 0},
+                {'name': 'Reset', 'type': 'action'},
+                {'name': 'Propagate', 'type': 'action'},
+                {'name': 'Reset below', 'type': 'action'},
+            ]},
+            {'name': 'Reset all points', 'type': 'action'},
+            {'name': 'Reset lower intensities', 'type': 'action'},
+        ]
+        self.controls = Parameter.create(name='peakControls', type='group', children=controls)
+        self._syncingControls = False
+
         self.t = ParameterTree()
-        self.t.setParameters(self.p, showTop=False)
+        self.t.setParameters(self.controls, showTop=False)
+        self._syncSelectedPointControls()
         
         # Only set geometry and show if not embedded (parent will manage layout)
         if not self.embedded:
@@ -275,43 +200,95 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
 
     def makeConnections(self):
         self.p1.scene().sigMouseClicked.connect(self.onClick)
-        
-        self.p.keys()['RESET ALL POINTS'].sigActivated.connect(self.resetAllPoints)
-        self.p.keys()['RESET ALL LOWER INTENSITIES'].sigActivated.connect(self.resetAllPointsLowerInt)
+        self.p.param('Peak type').sigValueChanged.connect(self._syncPeakTypeFromData)
+        self.p.param('Auto find peak').sigValueChanged.connect(self._syncAutoFindFromData)
 
+        self.controls.param('Peak type').sigValueChanged.connect(self._setPeakTypeFromControls)
+        self.controls.param('Auto find peak').sigValueChanged.connect(self._setAutoFindFromControls)
+        self.controls.param('Selected peak').param('x').sigValueChanged.connect(self._selectedPointEdited)
+        self.controls.param('Selected peak').param('y').sigValueChanged.connect(self._selectedPointEdited)
+        self.controls.param('Selected peak').param('Reset').sigActivated.connect(self.resetSelectedPoint)
+        self.controls.param('Selected peak').param('Propagate').sigActivated.connect(self.propagateSelectedPoint)
+        self.controls.param('Selected peak').param('Reset below').sigActivated.connect(self.resetSelectedPointBelow)
+        self.controls.param('Reset all points').sigActivated.connect(self.resetAllPoints)
+        self.controls.param('Reset lower intensities').sigActivated.connect(self.resetAllPointsLowerInt)
 
-        self.p.keys()['P1'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('P1'))
-        self.p.keys()['P2'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('P2'))
-        self.p.keys()['P3'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('P3'))
-        self.p.keys()['P4'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('P4'))
-        self.p.keys()['P5'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('P5'))
-        self.p.keys()['N1'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('N1'))
-        self.p.keys()['N2'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('N2'))
-        self.p.keys()['N3'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('N3'))
-        self.p.keys()['N4'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('N4'))
-        self.p.keys()['N5'].keys()['RESET'].sigActivated.connect(lambda:self.resetPoint('N5'))
+    def _selectedPeak(self):
+        return self.p['Peak type']
 
-        self.p.keys()['P1'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('P1'))
-        self.p.keys()['P2'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('P2'))
-        self.p.keys()['P3'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('P3'))
-        self.p.keys()['P4'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('P4'))
-        self.p.keys()['P5'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('P5'))
-        self.p.keys()['N1'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('N1'))
-        self.p.keys()['N2'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('N2'))
-        self.p.keys()['N3'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('N3'))
-        self.p.keys()['N4'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('N4'))
-        self.p.keys()['N5'].keys()['PROPAGATE'].sigActivated.connect(lambda:self.propagatePointSignal.emit('N5'))
+    def _selectedPeakParam(self):
+        return self.p.param(self._selectedPeak())
 
-        self.p.keys()['P1'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('P1'))
-        self.p.keys()['P2'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('P2'))
-        self.p.keys()['P3'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('P3'))
-        self.p.keys()['P4'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('P4'))
-        self.p.keys()['P5'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('P5'))
-        self.p.keys()['N1'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('N1'))
-        self.p.keys()['N2'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('N2'))
-        self.p.keys()['N3'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('N3'))
-        self.p.keys()['N4'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('N4'))
-        self.p.keys()['N5'].keys()['RESET BELOW'].sigActivated.connect(lambda:self.resetPointBelowSignal.emit('N5'))
+    def _selectedPeakControls(self):
+        return self.controls.param('Selected peak')
+
+    def _syncSelectedPointControls(self):
+        if not hasattr(self, 'controls'):
+            return
+
+        pointParam = self._selectedPeakParam()
+        selectedControls = self._selectedPeakControls()
+
+        self._syncingControls = True
+        try:
+            self.controls.param('Peak type').setValue(self._selectedPeak())
+            self.controls.param('Auto find peak').setValue(self.p['Auto find peak'])
+            selectedControls.param('x').setValue(pointParam.param('x').value())
+            selectedControls.param('y').setValue(pointParam.param('y').value())
+        finally:
+            self._syncingControls = False
+
+    def _syncPeakTypeFromData(self, param, value):
+        if self._syncingControls:
+            return
+        self._syncSelectedPointControls()
+
+    def _syncAutoFindFromData(self, param, value):
+        if self._syncingControls:
+            return
+        self._syncingControls = True
+        try:
+            self.controls.param('Auto find peak').setValue(value)
+        finally:
+            self._syncingControls = False
+
+    def _setPeakTypeFromControls(self, param, value):
+        if self._syncingControls:
+            return
+        self.p.param('Peak type').setValue(value)
+        self._syncSelectedPointControls()
+
+    def _setAutoFindFromControls(self, param, value):
+        if self._syncingControls:
+            return
+        self.p.param('Auto find peak').setValue(value)
+
+    def _selectedPointEdited(self, param, value):
+        if self._syncingControls:
+            return
+
+        point = self._selectedPeak()
+        x = self._selectedPeakControls().param('x').value()
+        y = self._selectedPeakControls().param('y').value()
+
+        self.p.param(point).param('x').setValue(x)
+        self.p.param(point).param('y').setValue(y)
+        if x == 0:
+            self.labelDict[point].setPos(np.nan, np.nan)
+            self.pointDict[point].setData([0], [0])
+        else:
+            self.labelDict[point].setPos(x, y)
+            self.pointDict[point].setData(x=[x], y=[y])
+        self.finishSignal.emit()
+
+    def resetSelectedPoint(self):
+        self.resetPoint(self._selectedPeak())
+
+    def propagateSelectedPoint(self):
+        self.propagatePointSignal.emit(self._selectedPeak())
+
+    def resetSelectedPointBelow(self):
+        self.resetPointBelowSignal.emit(self._selectedPeak())
 
     def nextPeakType(self):
         if self.p['Peak type'] == 'P1':
@@ -416,6 +393,8 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         self.p.keys()[point].keys()['y'].setValue(0)
         self.labelDict[point].setPos(np.nan,np.nan)
         self.pointDict[point].setData([0],[0])
+        if point == self._selectedPeak():
+            self._syncSelectedPointControls()
 
     def resetPoint(self, point, emitSignal=True):
         """Reset a point and its paired peak (P3 resets N3 and vice versa)."""
@@ -446,6 +425,8 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
         self.p.keys()[point].keys()['x'].setValue(x)
         self.p.keys()[point].keys()['y'].setValue(y)
         self.pointDict[point].setData(x=[x],y=[y])   
+        if point == self._selectedPeak():
+            self._syncSelectedPointControls()
 
     def getPoint(self,point):
         x=self.p.keys()[point].keys()['x'].value()
@@ -480,6 +461,7 @@ class myGLW(pg.GraphicsLayoutWidget,QtCore.QObject):
 
         self.linePlot.setData(self.times,self.data1)
         self.p1.setXRange(0,8)
+        self._syncSelectedPointControls()
         
 
         #self.p1.setXRange(0,8)

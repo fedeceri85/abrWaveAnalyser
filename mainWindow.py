@@ -252,22 +252,12 @@ class abrWindow(QMainWindow):
         self.waveformDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         self.addDockWidget(Qt.RightDockWidgetArea, self.waveformDock)
         
-        # File operations dock
+        # File status dock. Common commands live in the menu/toolbar so the
+        # dock stays readable on HD screens.
         paramsFile = [
-            {'name': 'Single file mode', 'type': 'group', 'children': [
-                {'name': 'Open file', 'type': 'action'},
-                {'name': 'Save ABR traces', 'type': 'action'},
-                {'name': 'Save ABR plot', 'type': 'action'},
-                {'name': 'Save results', 'type': 'action'},
-            ]},
+            {'name': 'Loaded file', 'type': 'str', 'value': 'No file loaded', 'readonly': True},
             {'name': 'Multiple file mode', 'type': 'group', 'children': [
-                {'name': 'Open experiment list', 'type': 'action'},
-                {'name': 'Previous file', 'type': 'action', 'enabled': False},
-                {'name': 'Next file', 'type': 'action', 'enabled': False},
-                {'name': 'Selected File', 'type': 'str', 'value': '0/0'},
-                {'name': 'Plot avg ABR traces', 'type': 'action'},
-                {'name': 'Export avg ABR traces', 'type': 'action'},
-                {'name': 'Export results', 'type': 'action'},
+                {'name': 'Selected File', 'type': 'str', 'value': '0/0', 'readonly': True},
             ]},
         ]
         
@@ -275,32 +265,23 @@ class abrWindow(QMainWindow):
         self.tFile = ParameterTree()
         self.tFile.setParameters(self.pFile, showTop=False)
         
-        self.fileDock = QDockWidget("File Operations", self)
+        self.fileDock = QDockWidget("File Status", self)
         self.fileDock.setWidget(self.tFile)
         self.fileDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         self.addDockWidget(Qt.RightDockWidgetArea, self.fileDock)
         
-        # Analysis controls dock
+        # Analysis settings dock. Workflow actions live in the menu/toolbar.
         params = [
             {'name': 'Reverse polarity', 'type': 'bool', 'value': False},
-            {'name': 'Set threshold', 'type': 'action'},
-            {'name': 'Set no threshold', 'type': 'action'},
-            {'name': 'Guess Wave Peak positions', 'type': 'action'},
-            {'name': 'Guess Wave Peak higher intensities', 'type': 'action'},
-            {'name': 'Guess Wave Peak lower intensities', 'type': 'action'},
-            {'name': 'ML Wave 1 (experimental)', 'type': 'action'},
-            {'name': 'ML threshold (experimental)', 'type': 'action'},
             {'name': 'X-axis lim (ms)', 'type': 'float', 'value': 8.0},
-            {'name': 'Plot wave analysis', 'type': 'action'},                        
             {'name': 'Frequencies', 'type': 'str', 'value': '100,3000,6000,12000,18000,24000,30000,36000,42000'},
-            {'name': 'Plot thresholds', 'type': 'action'},
         ]
         
         self.p = Parameter.create(name='params', type='group', children=params)
         self.t = ParameterTree()
         self.t.setParameters(self.p, showTop=False)
         
-        self.analysisDock = QDockWidget("Analysis Controls", self)
+        self.analysisDock = QDockWidget("Settings", self)
         self.analysisDock.setWidget(self.t)
         self.analysisDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         self.addDockWidget(Qt.RightDockWidgetArea, self.analysisDock)
@@ -330,8 +311,10 @@ class abrWindow(QMainWindow):
         # Set dock width (narrower right panel, ~320px)
         self.resizeDocks([self.waveformDock], [320], Qt.Horizontal)
         
-        # ==================== Create Menu Bar ====================
+        # ==================== Create Actions, Menu Bar and Toolbar ====================
+        self.createActions()
         self.createMenuBar()
+        self.createToolBar()
         
         # ==================== Create Status Bar ====================
         self.statusBar = QStatusBar()
@@ -361,10 +344,215 @@ class abrWindow(QMainWindow):
             self.unsavedChanges = True
             self.setWindowTitle(self.windowTitle() + " *")
     
+    def _standardIcon(self, standardPixmap):
+        """Return a platform-native icon for toolbar/menu actions."""
+        return self.style().standardIcon(standardPixmap)
+
+    def _makeAction(self, text, callback, shortcut=None, statusTip=None, icon=None):
+        """Create a QAction and connect it to a no-argument callback."""
+        if icon is None:
+            action = QtWidgets.QAction(text, self)
+        else:
+            action = QtWidgets.QAction(icon, text, self)
+        if shortcut:
+            action.setShortcut(QtGui.QKeySequence(shortcut))
+        if statusTip:
+            action.setStatusTip(statusTip)
+            action.setToolTip(statusTip)
+        action.triggered.connect(lambda checked=False: callback())
+        return action
+
+    def createActions(self):
+        """Create reusable actions for the menu bar and toolbar."""
+        style = QtWidgets.QStyle
+
+        self.openFileAction = self._makeAction(
+            "Open Single Experiment",
+            self.openFileCb,
+            shortcut="Ctrl+O",
+            statusTip="Open a single ABR file",
+            icon=self._standardIcon(style.SP_DialogOpenButton),
+        )
+        self.openExperimentAction = self._makeAction(
+            "Open Experiment List",
+            self.openMultipleFilesCb,
+            shortcut="Ctrl+Shift+O",
+            statusTip="Open an experiment list",
+            icon=self._standardIcon(style.SP_DirOpenIcon),
+        )
+        self.saveResultsAction = self._makeAction(
+            "Save Results",
+            self.saveResultsCb,
+            shortcut="Ctrl+S",
+            statusTip="Save wave analysis results and thresholds",
+            icon=self._standardIcon(style.SP_DialogSaveButton),
+        )
+        self.saveABRTracesAction = self._makeAction(
+            "Save ABR Traces",
+            lambda: self.saveABRTracesCb(None),
+            statusTip="Export the loaded ABR traces",
+        )
+        self.saveABRPlotAction = self._makeAction(
+            "Save ABR Plot",
+            self.saveABRPlotCb,
+            statusTip="Save the visible ABR plot as an image",
+        )
+        self.exportResultsAction = self._makeAction(
+            "Export Results",
+            self.saveResultsMultipleCb,
+            statusTip="Export combined results for an experiment list",
+        )
+        self.exportAverageTracesAction = self._makeAction(
+            "Export Avg Traces",
+            lambda: self.saveAverageABRTracesCb(None),
+            statusTip="Export averaged ABR traces for an experiment list",
+        )
+
+        self.previousFileAction = self._makeAction(
+            "Previous",
+            self.prevFileCb,
+            shortcut="Ctrl+Left",
+            statusTip="Open the previous file in the experiment list",
+            icon=self._standardIcon(style.SP_ArrowLeft),
+        )
+        self.nextFileAction = self._makeAction(
+            "Next",
+            self.nextFileCb,
+            shortcut="Ctrl+Right",
+            statusTip="Open the next file in the experiment list",
+            icon=self._standardIcon(style.SP_ArrowRight),
+        )
+
+        self.setThresholdAction = self._makeAction(
+            "Threshold",
+            self.setThresholdCb,
+            shortcut="Ctrl+T",
+            statusTip="Set the selected trace as the threshold",
+            icon=self._standardIcon(style.SP_DialogApplyButton),
+        )
+        self.setNoThresholdAction = self._makeAction(
+            "No Threshold",
+            self.setAboveThresholdCb,
+            statusTip="Mark this frequency as having no threshold",
+        )
+        self.guessAllAction = self._makeAction(
+            "Guess All",
+            lambda: self.guessWavePoints("both"),
+            statusTip="Guess wave peak positions above and below the selected trace",
+        )
+        self.guessHigherAction = self._makeAction(
+            "Guess Higher",
+            lambda: self.guessWavePoints("higher"),
+            statusTip="Guess wave peak positions at higher intensities",
+            icon=self._standardIcon(style.SP_ArrowUp),
+        )
+        self.guessLowerAction = self._makeAction(
+            "Guess Lower",
+            lambda: self.guessWavePoints("lower"),
+            statusTip="Guess wave peak positions at lower intensities",
+            icon=self._standardIcon(style.SP_ArrowDown),
+        )
+        self.mlWaveAction = self._makeAction(
+            "ML Wave 1",
+            self.MLGuessCB,
+            statusTip="Run the experimental Wave 1 model",
+        )
+        self.mlThresholdAction = self._makeAction(
+            "ML Threshold",
+            self.MLGuessThresholdsCb,
+            statusTip="Run the experimental threshold model",
+        )
+
+        self.plotResultsAction = self._makeAction(
+            "Wave Analysis",
+            self.plotResultsCb,
+            statusTip="Plot wave analysis results",
+        )
+        self.plotThresholdsAction = self._makeAction(
+            "Threshold",
+            self.plotThresholdsCb,
+            statusTip="Plot thresholds",
+        )
+        self.plotAverageTracesAction = self._makeAction(
+            "Avg ABR Traces",
+            lambda: self.plotAverageABRTracesCb(None),
+            statusTip="Plot averaged ABR traces for an experiment list",
+        )
+
+        self.dataActions = [
+            self.saveResultsAction,
+            self.saveABRTracesAction,
+            self.saveABRPlotAction,
+            self.setThresholdAction,
+            self.setNoThresholdAction,
+            self.guessAllAction,
+            self.guessHigherAction,
+            self.guessLowerAction,
+            self.mlWaveAction,
+            self.mlThresholdAction,
+            self.plotResultsAction,
+            self.plotThresholdsAction,
+        ]
+        self.multipleFileActions = [
+            self.previousFileAction,
+            self.nextFileAction,
+            self.exportResultsAction,
+            self.exportAverageTracesAction,
+            self.plotAverageTracesAction,
+        ]
+
+        self._setDataActionsEnabled(False)
+        self._setMultipleFileControlsEnabled(False)
+
+    def _setDataActionsEnabled(self, enabled):
+        for action in getattr(self, 'dataActions', []):
+            action.setEnabled(enabled)
+        if not enabled:
+            self._setMultipleFileControlsEnabled(False)
+
+    def _setMultipleFileControlsEnabled(self, enabled):
+        for action in getattr(self, 'multipleFileActions', []):
+            action.setEnabled(enabled)
+
+    def _setSelectedFileText(self, text):
+        self.pFile.param('Multiple file mode').param('Selected File').setOpts(value=text)
+
     def createMenuBar(self):
         """Create the application menu bar."""
         menubar = self.menuBar()
-        
+
+        fileMenu = menubar.addMenu('&File')
+        fileMenu.addAction(self.openFileAction)
+        fileMenu.addSeparator()
+        fileMenu.addAction(self.saveResultsAction)
+        fileMenu.addAction(self.saveABRTracesAction)
+        fileMenu.addAction(self.saveABRPlotAction)
+
+        experimentMenu = menubar.addMenu('&Experiment Lists')
+        experimentMenu.addAction(self.openExperimentAction)
+        experimentMenu.addSeparator()
+        experimentMenu.addAction(self.previousFileAction)
+        experimentMenu.addAction(self.nextFileAction)
+        experimentMenu.addSeparator()
+        experimentMenu.addSection('Plot')
+        experimentMenu.addAction(self.plotResultsAction)
+        experimentMenu.addAction(self.plotThresholdsAction)
+        experimentMenu.addAction(self.plotAverageTracesAction)
+        experimentMenu.addSeparator()
+        experimentMenu.addAction(self.exportResultsAction)
+        experimentMenu.addAction(self.exportAverageTracesAction)
+
+        analysisMenu = menubar.addMenu('&Analysis')
+        analysisMenu.addAction(self.setThresholdAction)
+        analysisMenu.addAction(self.setNoThresholdAction)
+        analysisMenu.addSeparator()
+        analysisMenu.addAction(self.guessAllAction)
+        analysisMenu.addAction(self.guessHigherAction)
+        analysisMenu.addAction(self.guessLowerAction)
+        analysisMenu.addSeparator()
+        analysisMenu.addAction(self.mlWaveAction)
+        analysisMenu.addAction(self.mlThresholdAction)
+
         # Help Menu
         helpMenu = menubar.addMenu('&Help')
         
@@ -378,6 +566,33 @@ class abrWindow(QMainWindow):
         # About Action (optional, reuses User Guide for now or could be separate)
         # aboutAction = QtWidgets.QAction('&About', self)
         # helpMenu.addAction(aboutAction)
+
+    def createToolBar(self):
+        """Create a compact toolbar for the common workflow actions."""
+        toolbar = self.addToolBar("Workflow")
+        toolbar.setObjectName("WorkflowToolBar")
+        toolbar.setMovable(False)
+        toolbar.setIconSize(QtCore.QSize(18, 18))
+        toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+
+        toolbar.addAction(self.openFileAction)
+        toolbar.addAction(self.openExperimentAction)
+        toolbar.addAction(self.saveResultsAction)
+        toolbar.addSeparator()
+        toolbar.addAction(self.previousFileAction)
+        toolbar.addAction(self.nextFileAction)
+        toolbar.addSeparator()
+        toolbar.addAction(self.setThresholdAction)
+        toolbar.addAction(self.setNoThresholdAction)
+        toolbar.addSeparator()
+        toolbar.addAction(self.guessLowerAction)
+        toolbar.addAction(self.guessHigherAction)
+        toolbar.addSeparator()
+        toolbar.addAction(self.mlWaveAction)
+        toolbar.addSeparator()
+        toolbar.addAction(self.plotResultsAction)
+
+        self.workflowToolBar = toolbar
 
     def showHelp(self):
         """Show the User Guide dialog."""
@@ -464,9 +679,8 @@ class abrWindow(QMainWindow):
         dlg.setFileMode(QFileDialog.ExistingFile)
         
         #If we open a single file, we disable the next and previous file buttons
-        self.pFile.param('Multiple file mode').param('Next file').setOpts(enabled=False) 
-        self.pFile.param('Multiple file mode').param('Previous file').setOpts(enabled=False)
-        self.pFile.param('Multiple file mode').param('Selected File').setOpts(value = str('0/0'))
+        self._setMultipleFileControlsEnabled(False)
+        self._setSelectedFileText('0/0')
 
         self.currentFileIndex = 0
         self.experimentList = None
@@ -500,8 +714,6 @@ class abrWindow(QMainWindow):
             self.experimentList = pd.read_csv(filenames[0])
             if 'Group' in self.experimentList.columns:
                 self.experimentList['Group'] = self.experimentList['Group'].astype(str)
-            self.pFile.param('Multiple file mode').param('Next file').setOpts(enabled=True) 
-            self.pFile.param('Multiple file mode').param('Previous file').setOpts(enabled=True)
 
             folder = os.path.split(filenames[0])[0]
             print(folder)
@@ -511,7 +723,8 @@ class abrWindow(QMainWindow):
             
             self.totalFiles = self.experimentList.shape[0]
             self.currentFileIndex = 0
-            self.pFile.param('Multiple file mode').param('Selected File').setOpts(value = str(self.currentFileIndex+1)+'/'+str(self.totalFiles))
+            self._setSelectedFileText(str(self.currentFileIndex+1)+'/'+str(self.totalFiles))
+            self._setMultipleFileControlsEnabled(True)
             
             #If the file name is not a full path, we add the folder of the selected file to it.
             for j,el in self.experimentList.iterrows():
@@ -533,7 +746,7 @@ class abrWindow(QMainWindow):
         self.currentFileIndex+=1
         if self.currentFileIndex == self.totalFiles:
             self.currentFileIndex = 0
-        self.pFile.param('Multiple file mode').param('Selected File').setOpts(value = str(self.currentFileIndex+1)+'/'+str(self.totalFiles))
+        self._setSelectedFileText(str(self.currentFileIndex+1)+'/'+str(self.totalFiles))
         self.openFileFromMultiple()
 
     def prevFileCb(self):
@@ -543,7 +756,7 @@ class abrWindow(QMainWindow):
         self.currentFileIndex-=1
         if self.currentFileIndex == -1:
             self.currentFileIndex = self.totalFiles-1
-        self.pFile.param('Multiple file mode').param('Selected File').setOpts(value = str(self.currentFileIndex+1)+'/'+str(self.totalFiles))
+        self._setSelectedFileText(str(self.currentFileIndex+1)+'/'+str(self.totalFiles))
         self.openFileFromMultiple()
     
     def initData(self):
@@ -606,6 +819,8 @@ class abrWindow(QMainWindow):
         
         # Update status bar
         self.statusBar.showMessage(f"Loaded: {self.currentFile} | {len(self.frequencies)} frequencies, {len(self.intensities)} intensities")
+        self.pFile.param('Loaded file').setOpts(value=self.currentFile)
+        self._setDataActionsEnabled(True)
 
         self.plotDict,self.wavePointsPlotDict, self.plotToFreqIntMap = makeFigureqt(freqs,intens,self.abr.values,self.layout,'',fs=self.fs,wavePoints=None,xlim=self.p['X-axis lim (ms)'])
         
@@ -700,27 +915,8 @@ class abrWindow(QMainWindow):
         
     def makeConnections(self):
         #p.keys()['Strain'].sigValueChanged.connect(changeStrainCb)
-        self.pFile.param('Single file mode').param('Open file').sigActivated.connect(self.openFileCb)
         self.p.keys()['Reverse polarity'].sigValueChanged.connect(self.reversePolarityCb)
-        self.p.keys()['Set threshold'].sigActivated.connect(self.setThresholdCb)
-        self.p.keys()['Set no threshold'].sigActivated.connect(self.setAboveThresholdCb)
-        self.p.keys()['Plot wave analysis'].sigActivated.connect(self.plotResultsCb)
-        self.p.keys()['Plot thresholds'].sigActivated.connect(self.plotThresholdsCb)
-        self.p.keys()['Guess Wave Peak positions'].sigActivated.connect(lambda: self.guessWavePoints('both'))
-        self.p.keys()['Guess Wave Peak higher intensities'].sigActivated.connect(lambda: self.guessWavePoints('higher'))
-        self.p.keys()[ 'Guess Wave Peak lower intensities'].sigActivated.connect(lambda: self.guessWavePoints('lower'))
-        self.p.keys()['ML Wave 1 (experimental)'].sigActivated.connect(self.MLGuessCB)
-        self.p.keys()['ML threshold (experimental)'].sigActivated.connect(self.MLGuessThresholdsCb)
         self.p.keys()['X-axis lim (ms)'].sigValueChanged.connect(self.changeXlimCb)
-        self.pFile.param('Single file mode').param('Save ABR traces').sigActivated.connect(self.saveABRTracesCb)
-        self.pFile.param('Single file mode').param('Save ABR plot').sigActivated.connect(self.saveABRPlotCb)
-        self.pFile.param('Single file mode').param('Save results').sigActivated.connect(self.saveResultsCb)
-        self.pFile.param('Multiple file mode').param('Open experiment list').sigActivated.connect(self.openMultipleFilesCb)
-        self.pFile.param('Multiple file mode').param('Next file').sigActivated.connect(self.nextFileCb)
-        self.pFile.param('Multiple file mode').param('Previous file').sigActivated.connect(self.prevFileCb)
-        self.pFile.param('Multiple file mode').param('Export results').sigActivated.connect(self.saveResultsMultipleCb)
-        self.pFile.param('Multiple file mode').param('Plot avg ABR traces').sigActivated.connect(self.plotAverageABRTracesCb)
-        self.pFile.param('Multiple file mode').param('Export avg ABR traces').sigActivated.connect(self.saveAverageABRTracesCb)
 
         self.waveAnalysisWidget.finishSignal.connect(self.retrieveResultsCb)
         self.waveAnalysisWidget.changeTraceSignal.connect(self.navigateTraces)
