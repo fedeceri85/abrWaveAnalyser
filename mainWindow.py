@@ -942,6 +942,7 @@ class abrWindow(QMainWindow):
         QShortcut(QtGui.QKeySequence("R"), self).activated.connect(lambda: self.guessWavePoints("higher"))
         QShortcut(QtGui.QKeySequence("F"), self).activated.connect(lambda: self.guessWavePoints("lower"))
         QShortcut(QtGui.QKeySequence("Z"), self).activated.connect(self.setThresholdCb)
+        QShortcut(QtGui.QKeySequence("T"), self).activated.connect(lambda: self.resetPointBelowCb(peakName='P1'))
         
         # Peak Selection
         def setPeak(ptype):
