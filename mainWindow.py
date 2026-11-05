@@ -1108,51 +1108,41 @@ class abrWindow(QMainWindow):
 
 
     def addMissingIntensities(self,wavePoints):
-        # Keep annotations for any wave, including incomplete peak/trough pairs.
-        pointColumns = [column for column in wavePoints.columns
-                        if column.startswith(('P', 'N')) and column.endswith(('_x', '_y'))]
-        wavePoints = wavePoints.dropna(subset=pointColumns, how='all')
+        wavePoints = wavePoints.copy()
 
-        #Add amplitude = 0 for missing intensities below threshold
+        # Add rows using the same threshold/recorded-trace rules for every wave.
         rowsToAppend = []
         for freq in self.frequencies:
             threshold = self.threshDict[str(int(freq))]
-            intensities = wavePoints.loc[wavePoints['Freq']==freq,'Intensity']
-            missingIntensities = np.setdiff1d(self.intensities,intensities)
+            intensities = wavePoints.loc[wavePoints['Freq'] == freq, 'Intensity']
+            missingIntensities = np.setdiff1d(self.intensities, intensities)
+            for intens in missingIntensities:
+                if intens < threshold or (freq, intens) in self.abr.index:
+                    rowsToAppend.append({'Freq': freq, 'Intensity': intens})
 
+        if rowsToAppend:
+            wavePoints = pd.concat([wavePoints, pd.DataFrame(rowsToAppend)],
+                                   ignore_index=True)
 
-            for intens in    missingIntensities:
-                if intens < threshold:
-                    row = pd.Series(index=wavePoints.columns,dtype='object')
-                    row['Freq'] = freq
-                    row['Intensity'] = intens
-                    row['P1_x'] = np.nan
-                    row['P1_y'] = 0
-                    row['N1_x'] = np.nan 
-                    row['N1_y'] = 0
-                    row['Wave 1 amplitude (uV)'] = 0
-                    row['Wave 1 latency (ms)'] = np.nan
-                    rowsToAppend.append(row)
-                else:
-                    #check whether the particular intensity/freq combination is in the abr, if it is than the amplitude is 0, if it is no than we don't add it
-                    if (freq,intens) in self.abr.index:
-                        row = pd.Series(index=wavePoints.columns,dtype='object')
-                        row['Freq'] = freq
-                        row['Intensity'] = intens
-                        row['P1_x'] = np.nan
-                        row['P1_y'] = 0
-                        row['N1_x'] = np.nan 
-                        row['N1_y'] = 0
-                        row['Wave 1 amplitude (uV)'] = 0
-                        row['Wave 1 latency (ms)'] = np.nan
-                        rowsToAppend.append(row)
+        # A marked latency distinguishes annotations from generated zero values.
+        # Only fill peak types that were marked somewhere at that frequency.
+        for wave in range(1, 6):
+            for kind in ('P', 'N'):
+                xColumn, yColumn = f'{kind}{wave}_x', f'{kind}{wave}_y'
+                for column in (xColumn, yColumn):
+                    if column not in wavePoints.columns:
+                        wavePoints[column] = np.nan
+                for freq in wavePoints['Freq'].unique():
+                    frequencyRows = wavePoints['Freq'] == freq
+                    if wavePoints.loc[frequencyRows, xColumn].notna().any():
+                        missingPeak = frequencyRows & wavePoints[[xColumn, yColumn]].isna().all(axis=1)
+                        wavePoints.loc[missingPeak, yColumn] = 0
+                    else:
+                        wavePoints.loc[frequencyRows, [xColumn, yColumn]] = np.nan
+            wavePoints[f'Wave {wave} amplitude (uV)'] = (
+                wavePoints[f'P{wave}_y'] - wavePoints[f'N{wave}_y'])
+            wavePoints[f'Wave {wave} latency (ms)'] = wavePoints[f'P{wave}_x']
 
-        try:
-            rowsToAppend = pd.concat(rowsToAppend,axis=1,ignore_index=True).T
-            wavePoints = pd.concat([wavePoints,rowsToAppend],ignore_index=True)
-        except ValueError:
-            pass
-        
         return wavePoints
     
     def plotResultsCb(self):
