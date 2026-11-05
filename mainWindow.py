@@ -1108,7 +1108,10 @@ class abrWindow(QMainWindow):
 
 
     def addMissingIntensities(self,wavePoints):
-        wavePoints = wavePoints.dropna(subset=['Wave 1 amplitude (uV)'])
+        # Keep annotations for any wave, including incomplete peak/trough pairs.
+        pointColumns = [column for column in wavePoints.columns
+                        if column.startswith(('P', 'N')) and column.endswith(('_x', '_y'))]
+        wavePoints = wavePoints.dropna(subset=pointColumns, how='all')
 
         #Add amplitude = 0 for missing intensities below threshold
         rowsToAppend = []
@@ -1156,7 +1159,6 @@ class abrWindow(QMainWindow):
         if not self.multipleFilesMode:
             frequenciesToPlot = np.array(self.p.keys()['Frequencies'].value().split(',')).astype(int)
             wavePoints = self.wavePoints.loc[self.wavePoints['Freq'].isin(frequenciesToPlot)]
-            #find the wavepoints with nan as wave 1 amplitude and remove the row from the dataframe
             wavePoints = self.addMissingIntensities(wavePoints)
 
             self.resultPlot = resultWindow(wavepoints=wavePoints,kind='scatter')
