@@ -28,6 +28,8 @@ Run in a command/terminal window:
 - Select next peak: `E`
 - Guess peaks at lower intensities: `F`
 - Guess peaks at higher intensities: `R`
+- Guess only the selected peak at higher/lower intensities: `T` / `G`
+- Reset wave I at the current and lower intensities: `Y`
 - Set threshold: `Z`
 
 ## Supported file formats
@@ -38,4 +40,4 @@ Initial manual labelling of ABR peaks can be used as a starting point to automat
 A machine-learning model can be used to semi-automatically determine wave 1 position (P1 and N1) and thresholds for all traces. Use of these methods currently requires traces containing exactly 1953 points. 
 
 ## Assumptions
-Latency is not calculated for traces which do not have a annotated wave 1, whereas the software assumes that the amplitude is 0 for any sound level not esplicitly annotated, unless the abr trace is not present in the data. 
+Latency is not calculated for traces which do not have a annotated wave 1, whereas the software assumes that the amplitude is 0 for any sound level not esplicitly annotated, unless the abr trace is not present in the data.

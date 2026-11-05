@@ -72,6 +72,10 @@ HELP_CONTENT = """
         <td><b>Z</b></td><td>Set Threshold</td>
         <td><b>E</b></td><td>Cycle Peak Type</td>
     </tr>
+    <tr>
+        <td><b>T / G</b></td><td>Guess Selected Peak Higher/Lower</td>
+        <td><b>Y</b></td><td>Reset Wave I Here and Below</td>
+    </tr>
 </table>
 
 <h2 style="color: #0078d4;">Saving Results</h2>
