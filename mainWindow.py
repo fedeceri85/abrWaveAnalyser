@@ -1000,8 +1000,8 @@ class abrWindow(QMainWindow):
     def saveResultsMultipleCb(self):
         rows = []
         for j,el in self.experimentList.iterrows():
-            self.folder, self.currentFile = os.path.split(el['Filename'])
-            wavepoints = pd.read_csv(os.path.join(self.folder,os.path.splitext(self.currentFile)[0]+'_waveAnalysisResults.csv'))
+            folder, currentFile = os.path.split(el['Filename'])
+            wavepoints = pd.read_csv(os.path.join(folder,os.path.splitext(currentFile)[0]+'_waveAnalysisResults.csv'))
             wavepoints['Group'] = el['Group']
             wavepoints['MouseID'] = el['MouseID']
             rows.append(wavepoints)
@@ -1485,8 +1485,8 @@ class abrWindow(QMainWindow):
         dlg.setFileMode(QtWidgets.QFileDialog.Directory)
         rows = []
         for j,el in self.experimentList.iterrows():
-            self.folder, self.currentFile = os.path.split(el['Filename'])
-            abr,fs = at.extractABR(os.path.join(self.folder,self.currentFile))
+            folder, currentFile = os.path.split(el['Filename'])
+            abr,fs = at.extractABR(os.path.join(folder,currentFile))
             abr['Group'] = el['Group']
             abr=abr.reset_index()
             rows.append(abr)
@@ -1578,8 +1578,8 @@ class abrWindow(QMainWindow):
 
         rows = []
         for j,el in self.experimentList.iterrows():
-            self.folder, self.currentFile = os.path.split(el['Filename'])
-            abr,fs = at.extractABR(os.path.join(self.folder,self.currentFile))
+            folder, currentFile = os.path.split(el['Filename'])
+            abr,fs = at.extractABR(os.path.join(folder,currentFile))
             xlim = int(self.p['X-axis lim (ms)']*fs/1000)
             abr = abr.loc[:,0:xlim]
             abr['Group'] = el['Group']
